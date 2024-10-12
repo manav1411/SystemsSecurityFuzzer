@@ -1,9 +1,20 @@
 # SystemsSecurityFuzzer
 A black-box fuzzer for binaries
 
-Fuzzer can be found in `fuzzer.py`
+Fuzzer is in `fuzzer.py`
+
+
+
+## basic test case
 
 `test.c`: basic C program that outputs user input
+
+```gcc test.c -o test```: [optional] to compile.
+
 `test`: executable for above C file.
+
 `test.txt`: valid input for above C file.
-compile like: ```gcc test.c -o test```
+
+
+
+`python3 fuzzer.py -f test -i test.txt`: runs fuzzer
