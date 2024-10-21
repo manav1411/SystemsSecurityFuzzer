@@ -46,7 +46,13 @@ def long_input_test(file):
     except Exception as e:
         print(f"{RED}[ERROR] An error occurred: {e}{RESET}")
 
-
+# Call this when finding an invalid input
+def write_crash_output(filename, input):
+    output_file = './fuzzer_output/bad_' + filename + '.txt'
+    with open(output_file, 'w') as file:
+        file.write(input)
+        file.close()
+    print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
 
 if __name__ == "__main__":
     # Argument parsing
