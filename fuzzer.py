@@ -50,7 +50,7 @@ def long_input_test(file):
 
 # Call this when finding an invalid input
 def write_crash_output(filename, input):
-    output_file = './fuzzer_output/bad_' + filename + '.txt'
+    output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
     with open(output_file, 'w') as file:
         file.write(input)
         file.close()
