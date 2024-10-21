@@ -11,6 +11,7 @@ def valid_input_test(file, words):
     for word in words:
         try:
             # Run file, pass it given word, capture output.
+            print(file)
             process = subprocess.Popen([f"./{file}"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             output, error = process.communicate(input=word)
 
@@ -42,6 +43,7 @@ def long_input_test(file):
         return_code = process.returncode
         if return_code != 0:
             print(f"{RED}[ERROR]{RESET} exit code: {return_code}, for {YELLOW}'{long_input}'{RESET}: {error.strip()}")
+            write_crash_output(file, long_input)
 
     except Exception as e:
         print(f"{RED}[ERROR] An error occurred: {e}{RESET}")
