@@ -7,6 +7,10 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 
+'''
+https://en.wikipedia.org/wiki/American_Fuzzy_Lop_(software)
+'''
+
 def valid_input_test(file, words):
     for word in words:
         try:
@@ -64,25 +68,28 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--threads', type=int, default=1, help='Number of threads (ignored for now)')
     args = parser.parse_args()
 
+    filepath = './binaries/' + args.file
+    inputpath = './example_inputs/' + args.input
+
     # Checks binary file exists
     try:
-        with open(args.file, 'r') as f:
+        with open(filepath, 'r') as f:
             pass
     except FileNotFoundError:
-        print(f"{RED}ERROR 404: the file '{args.file}' doesn't exist.{RESET}")
+        print(f"{RED}ERROR 404: the file '{filepath}' doesn't exist.{RESET}")
         exit()
 
     words = []
     # Checks input file exists, extracts sample line-separated input into list
     try:
-        with open(args.input, 'r') as f:
+        with open(inputpath, 'r') as f:
             words = f.readlines()
             words = [word.strip() for word in words]
     except FileNotFoundError:
-        print(f"{RED}ERROR 404: the file '{args.input}' doesn't exist.{RESET}")
+        print(f"{RED}ERROR 404: the file '{inputpath}' doesn't exist.{RESET}")
         exit()
 
 
     # runs binary with the list of words
-    valid_input_test(args.file, words)
-    long_input_test(args.file)
+    valid_input_test(filepath, words)
+    long_input_test(filepath)

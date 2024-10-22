@@ -1,4 +1,7 @@
-Documentation
+# Documentation
+## Team FuzzForce
+### Jerry Yang (z5421983) | Manav Dodia (z5417834) | Jasmin XXX (z5482839) | Isabelle Dwyer (z5413928)
+
 Your fuzzer design and functionality (around 1-2 pages)
 
 This section should explain, in a readable manner:

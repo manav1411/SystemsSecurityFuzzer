@@ -17,4 +17,4 @@ Fuzzer is in `fuzzer.py`
 
 
 
-`python3 fuzzer.py -f test -i test.txt`: runs fuzzer
+`python3 src/fuzzer.py -f test -i test.txt`: runs fuzzer
