@@ -1,5 +1,7 @@
 import argparse
 import subprocess
+import sys
+import json_fuzzer
 
 # ANSI colors
 RESET = "\033[0m"
@@ -61,15 +63,12 @@ def write_crash_output(filename, input):
     print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
 
 if __name__ == "__main__":
-    # Argument parsing
-    parser = argparse.ArgumentParser(description='Multithreaded file runner.')
-    parser.add_argument('-f', '--file', type=str, required=True, help='binary to run')
-    parser.add_argument('-i', '--input', type=str, required=True, help='line-separated valid inputs for binary')
-    parser.add_argument('-t', '--threads', type=int, default=1, help='Number of threads (ignored for now)')
-    args = parser.parse_args()
+    if len(sys.argv) != 3:
+        print("Usage: ./fuzzer [binaryname] [sampleinput.txt]")
+        exit()
 
-    filepath = './binaries/' + args.file
-    inputpath = './example_inputs/' + args.input
+    filepath = './binaries/' + sys.argv[1] # Binary Name
+    inputpath = './example_inputs/' + sys.argv[2] # Test Input Name
 
     # Checks binary file exists
     try:
@@ -83,13 +82,14 @@ if __name__ == "__main__":
     # Checks input file exists, extracts sample line-separated input into list
     try:
         with open(inputpath, 'r') as f:
-            words = f.readlines()
-            words = [word.strip() for word in words]
+            words = f.read()
     except FileNotFoundError:
         print(f"{RED}ERROR 404: the file '{inputpath}' doesn't exist.{RESET}")
         exit()
 
+    if json_fuzzer.is_json(words):
+        print("Found JSON Input > Fuzzing")
+        json_fuzzer.fuzz_json(filepath, words)
 
-    # runs binary with the list of words
-    valid_input_test(filepath, words)
-    long_input_test(filepath)
+    # Other filetype checks
+    print("NOT JSON")
