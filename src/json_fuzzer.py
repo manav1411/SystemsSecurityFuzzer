@@ -1,9 +1,10 @@
 import json
+import copy
 from pwn import *
-from fuzzer import write_crash_output
+from fuzzer import write_crash_output, get_process
 
 # Number of Total Mutations
-NUM_MUTATIONS = 10
+NUM_MUTATIONS = 3
 
 # Hardcoded Values for Initial Mutation of Input
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -27,7 +28,19 @@ def is_json(words):
     
     return True
 
-# 
+def send_to_process(p, payload, filepath):
+    p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
+    p.proc.stdin.close()
+
+    code = p.poll(True)
+    
+    # TODO: I'm not sure if this is the right check or not
+    if code != 0:
+        write_crash_output(filepath, payload)
+        return True
+    else:
+        return False
+    
 '''
     Main call when fuzzing JSON
     The second strategy is to concentrate on finding bugs after the document has been parsed/processed. In this case 
@@ -48,43 +61,72 @@ def fuzz_json(filepath, words):
 
     # Endlessly loop through mutations
     for i in range(0, NUM_MUTATIONS):
-        if perform_mutation(filepath, data, i):
+        deepcopy = copy.deepcopy(data)
+        if perform_mutation(filepath, deepcopy, i):
             exit()
 
-    print("No Crashable Input Found")
+    print("################################")
+    print("### No Crashable Input Found ###")
+    print("################################")
     exit()
 
 def perform_mutation(filepath, data: json, i):
-    payload = ''
+    if i == 0:          # Default Payload Test
+        print("> Testing Normal Payload")
+        send_to_process(get_process(filepath), data, filepath)
+    elif i == 1:
+        print("> Testing Sending Nothing")
+        send_to_process(get_process(filepath), '', filepath)
+    elif i == 2:        # Testing Adding Fields
+        if (add_fields(data, filepath)):
+            return True
+    elif i == 3:        # Testing Removing Fields
+        if (remove_fields(data, filepath)):
+            return True
+    elif i == 4:
+        print("Haven't done this yet!")
+        # TODO: Continue Implementing
 
-    if i == 0:                  # Default Payload Test
-        payload = data
-    elif i < 0 and i < 10:      # Testing Adding Fields
-        payload = add_fields(data, i)
+    return False
 
-    p = process(filepath, timeout=1.5)
-    p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
-    p.proc.stdin.close()
+def add_fields(data: json, filepath):
+    for i in range(1, 11):
+        p = get_process(filepath)
+        print(f"> Adding {i} Extra Field(s)")
+        deepcopy = copy.deepcopy(data)
 
-    code = p.poll(True)
-    
-    # TODO: I'm not sure if this is the right check or not
-    if code != 0:
-        write_crash_output(filepath, payload)
-        return True
-    else:
-        return False
-
-def add_fields(data: json, numfields):
-    jsonData = json.load(data)
-    for i in range(numfields):
-        jsonData[f"RandomField{i}"] = f"RandomValue{i}"
-
-    return jsonData
+        for j in range (0, i):
+            deepcopy[f"RandomField{j}"] = f"RandomValue{j}"
+        
+        if send_to_process(p, deepcopy, filepath):
+            return True
+        
+    return False
         
 
-def remove_fields(data):
-    return 0
+def remove_fields(data: json, filepath):
+    keys = data.keys()  
+    for i in range(0, len(keys)):
+        p = get_process(filepath)
+        print(f"> Removing Field at Index {i}")
+        deepcopy = copy.deepcopy(data)
 
-def send_nothing(data):
-    return 0
+        # Ghetto ass solution right now
+        # TODO: Pretty sure this only removes top level keys
+        j = 0
+        for keyValue in keys:
+            if j == i: 
+                print(f"    Deleting Field {keyValue}")
+                del deepcopy[keyValue]
+            j += 1
+        
+        if send_to_process(p, deepcopy, filepath):
+            return True
+        
+    return False
+
+# Mutate int inputs with defines
+# Mutate string inputs with defines
+# Flip Bits
+# Swap Types
+# Mutate Strings

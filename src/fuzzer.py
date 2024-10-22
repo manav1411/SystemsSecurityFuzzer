@@ -1,3 +1,5 @@
+from pwn import *
+import json
 import argparse
 import subprocess
 import sys
@@ -9,51 +11,6 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 
-'''
-https://en.wikipedia.org/wiki/American_Fuzzy_Lop_(software)
-'''
-
-def valid_input_test(file, words):
-    for word in words:
-        try:
-            # Run file, pass it given word, capture output.
-            print(file)
-            process = subprocess.Popen([f"./{file}"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            output, error = process.communicate(input=word)
-
-            # Print program output
-            if output:
-                print(f"{GREEN}'{word}'{RESET}: {output.strip()}")
-
-            # Case program exited with a non-0 return code
-            return_code = process.returncode
-            if return_code != 0:
-                print(f"{RED}[ERROR]{RESET} exit code: {return_code}, for {YELLOW}'{word}'{RESET}: {error.strip()}")
-
-        except Exception as e:
-            print(f"{RED}[ERROR] An error occurred: {e}{RESET}")
-
-
-def long_input_test(file):
-    long_input = 'A' * 100
-    try:
-        # Run file, pass it the long input, capture output.
-        process = subprocess.Popen([f"./{file}"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        output, error = process.communicate(input=long_input)
-
-        # Print program output
-        if output:
-            print(f"{YELLOW}'{long_input}'{RESET}: {output.strip()}")
-
-        # Check if the program exited with a non-0 return code
-        return_code = process.returncode
-        if return_code != 0:
-            print(f"{RED}[ERROR]{RESET} exit code: {return_code}, for {YELLOW}'{long_input}'{RESET}: {error.strip()}")
-            write_crash_output(file, long_input)
-
-    except Exception as e:
-        print(f"{RED}[ERROR] An error occurred: {e}{RESET}")
-
 # Call this when finding an invalid input
 def write_crash_output(filename, input):
     output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
@@ -61,6 +18,9 @@ def write_crash_output(filename, input):
         file.write(input)
         file.close()
     print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
+
+def get_process(filepath):
+    return process(filepath, timeout=1.5)
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -92,4 +52,4 @@ if __name__ == "__main__":
         json_fuzzer.fuzz_json(filepath, words)
 
     # Other filetype checks
-    print("NOT JSON")
+    print("Not a JSON File")
