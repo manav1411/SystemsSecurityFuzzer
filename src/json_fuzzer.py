@@ -80,10 +80,12 @@ Begins the mutation process
 def perform_mutation(filepath, data: json, i):
     if i == 0:          # Testing Default Payload
         print("> Testing Normal Payload")
-        send_to_process(get_process(filepath), data, filepath)
-    elif i == 1:        # Testing Nothing Payload
+        if send_to_process(get_process(filepath), data, filepath):
+            return True
+    elif i == 1:
         print("> Testing Sending Nothing")
-        send_to_process(get_process(filepath), '', filepath)
+        if send_to_process(get_process(filepath), '', filepath):
+            return True
     elif i == 2:        # Testing Adding Fields
         if (add_fields(data, filepath)):
             return True
