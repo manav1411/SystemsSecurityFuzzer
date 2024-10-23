@@ -1,5 +1,8 @@
 from pwn import *
+import io
 import csv
+from fuzzer import write_crash_output, get_process
+
 
 # taken from json_fuzzer.py, but not used
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -20,9 +23,34 @@ def is_csv(words):
         csv.reader(words)
     except:
         return False
-
     return True
 
+def csv_to_string(csv_filepath):
+    output = io.StringIO()
+
+    with open(csv_filepath, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+
+        writer = csv.writer(output)
+        for row in reader:
+            writer.writerow(row)
+
+    csv_string = output.getvalue()
+    output.close()
+    return csv_string
+
+def send_csv_to_process(p, payload, filepath):
+    payload = csv_to_string(payload)
+    p.sendline(csv_to_string(payload).encode('utf-8'))
+    p.proc.stdin.close()
+
+    code = p.poll(True)
+
+    if code != 0:
+        write_crash_output(filepath, payload)
+        return True
+    else:
+        return False
 
 def generate_random_csv(file_path, max_rows=10, max_columns=5):
     rows = random.randint(1, max_rows)
@@ -61,23 +89,6 @@ def generate_malformed_csv(file_path, max_rows=10, max_columns=5):
 
             csvwriter.writerow(row_data)
 
-
-def run_binary_with_csv(binary_path, csv_file):
-    try:
-        result = subprocess.run([binary_path, csv_file], check=True, capture_output=True, text=True)
-        print(f"Binary output for {csv_file}:\n{result.stdout}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error running binary for {csv_file}:\n{e.stderr}")
-
-
-def fuzz_binary(iterations, fuzz_dir):
-    for i in range(iterations):
-        # Either generate valid or malformed CSV
-        csv_file_path = os.path.join(fuzz_dir, f'fuzz_input_{i}.csv')
-
-        if random.random() < 0.5:
-            generate_random_csv(csv_file_path)
-        else:
-            generate_malformed_csv(csv_file_path)
-
-        run_binary_with_csv(csv_file_path)
+def run(filepath, words):
+#   todo
+    pass
