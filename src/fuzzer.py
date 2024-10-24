@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import sys
 import json_fuzzer
+import csv_fuzzer
 
 context.log_level='warn'
 
@@ -53,5 +54,6 @@ if __name__ == "__main__":
         print("Found JSON Input > Fuzzing")
         json_fuzzer.fuzz_json(filepath, words)
 
-    # Other filetype checks
-    print("Not a JSON File")
+    if csv_fuzzer.is_csv(words):
+        print("Found CSV Input  > Fuzzing")
+        csv_fuzzer.fuzz_csv(filepath, words)

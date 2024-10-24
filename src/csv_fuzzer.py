@@ -1,8 +1,11 @@
 from pwn import *
 import io
 import csv
+import copy
 from fuzzer import write_crash_output, get_process
 
+# Number of Total Mutations
+NUM_MUTATIONS = 3
 
 # taken from json_fuzzer.py, but not used
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -52,6 +55,27 @@ def send_csv_to_process(p, payload, filepath):
     else:
         return False
 
+def fuzz_csv(filepath, words):
+    csv_string = csv_to_string(words)
+
+    for i in range(0, NUM_MUTATIONS):
+        deepcopy = copy.deepcopy(csv_string)
+        if perform_mutation(filepath, deepcopy, i):
+            exit()
+
+def perform_mutation(filepath, data, i):
+    if i == 0:          # Default Payload Test
+        print("> Mutation Case 1")
+    elif i == 1:
+        print("> Mutation Case 2")
+    elif i == 2:
+        print("Haven't done this yet!")
+        # TODO: Continue Implementing
+    else:
+        return False
+
+    return False
+
 def generate_random_csv(file_path, max_rows=10, max_columns=5):
     rows = random.randint(1, max_rows)
     columns = random.randint(1, max_columns)
@@ -88,7 +112,3 @@ def generate_malformed_csv(file_path, max_rows=10, max_columns=5):
             # e.g. integer overflow, underflow, negative numbers, etc.
 
             csvwriter.writerow(row_data)
-
-def run(filepath, words):
-#   todo
-    pass
