@@ -12,7 +12,7 @@ YELLOW = "\033[93m"
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: ./fuzzer [binaryname] [sampleinput.txt]")
+        print("Usage: python3 src/fuzzer.py [binaryname] [sampleinput.txt]")
         exit()
 
     filepath = './binaries/' + sys.argv[1] # Binary Name

@@ -28,22 +28,24 @@ def is_csv(words):
         return False
     return True
 
-def csv_to_string(csv_filepath):
+def csv_to_string(words):
     output = io.StringIO()
+    writer = csv.writer(output)
 
-    with open(csv_filepath, 'r') as csvfile:
-        reader = csv.reader(csvfile)
+    reader = csv.reader(words)
 
-        writer = csv.writer(output)
-        for row in reader:
-            writer.writerow(row)
+    for row in reader:
+        writer.writerow(row)
 
     csv_string = output.getvalue()
     output.close()
     return csv_string
 
-def send_csv_to_process(p, payload, filepath):
-    payload = csv_to_string(payload)
+'''
+Sends a given input to a process, then returns whether the process crashes or not
+'''
+def send_to_process(p, csv_payload, filepath):
+    payload = csv_to_string(csv_payload)
     p.sendline(csv_to_string(payload).encode('utf-8'))
     p.proc.stdin.close()
 
@@ -55,62 +57,60 @@ def send_csv_to_process(p, payload, filepath):
     else:
         return False
 
+
+def add_extra_comma(data: csv, filepath):
+    print("> Testing Adding Comma")
+    for i in range(1, 11):
+        p = get_process(filepath)
+        print(f"  > Adding {i} Extra Field(s)")
+        d = copy.deepcopy(data)
+
+        csv_output = io.StringIO()
+        csvwriter = csv.writer(csv_output)
+
+        # Write all original data to the new CSV output
+        for row in d:
+            csvwriter.writerow(row)
+
+        new_row = [str(i)] * i  # Creates a row like ['1', '1', ..., '1']
+        new_row.extend([","] * i)  # Add 3 extra commas (i.e. empty fields)
+        csvwriter.writerow(new_row)  # Write the new row to the CSV
+
+        csv_output.close()
+
+        if send_to_process(p, d, filepath):
+            return True
+
+    return False
+
+
+'''
+Begins the mutation process with a range of CSV files
+'''
+def perform_mutation(filepath, data, i):
+    if i == 0:          # Default Payload Test
+        print("> Testing Normal Payload")
+        return send_to_process(get_process(filepath), data, filepath)
+    elif i == 1:
+        print("> Testing Empty Payload")
+        return send_to_process(get_process(filepath), "", filepath)
+    elif i == 2:
+        return add_extra_comma(data, filepath)
+    else:
+        return False
+
+
+'''
+Main function call to begin fuzzing CSV input binaries
+'''
 def fuzz_csv(filepath, words):
     csv_string = csv_to_string(words)
 
     for i in range(0, NUM_MUTATIONS):
         deepcopy = copy.deepcopy(csv_string)
-        print_crash_found()
-        exit()
+
+        if perform_mutation(filepath, deepcopy, i):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
-
-def perform_mutation(filepath, data, i):
-    if i == 0:          # Default Payload Test
-        print("> Mutation Case 1")
-    elif i == 1:
-        print("> Mutation Case 2")
-    elif i == 2:
-        print("Haven't done this yet!")
-        # TODO: Continue Implementing
-    else:
-        return False
-
-    return False
-
-def generate_random_csv(file_path, max_rows=10, max_columns=5):
-    rows = random.randint(1, max_rows)
-    columns = random.randint(1, max_columns)
-
-    with open(file_path, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-
-        for _ in range(rows):
-            row_data = [''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(1, 10)))
-                        for _ in range(columns)]
-            csvwriter.writerow(row_data)
-
-
-def generate_malformed_csv(file_path, max_rows=10, max_columns=5):
-    rows = random.randint(1, max_rows)
-    columns = random.randint(1, max_columns)
-
-    with open(file_path, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile)
-
-        for _ in range(rows):
-            # Omit cols randomly
-            if random.random() < 0.5:
-                columns_in_row = random.randint(1, columns)
-            else:
-                columns_in_row = columns
-
-            row_data = [''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(1, 10))) for _ in range(columns_in_row)]
-
-            if random.random() < 0.3:  # Add random extra commas or other invalid CSV syntax
-                row_data[random.randint(0, len(row_data) - 1)] += ',' * random.randint(1, 5)
-
-            # TODO: Add more malformed CSV cases
-            # e.g. integer overflow, underflow, negative numbers, etc.
-
-            csvwriter.writerow(row_data)
