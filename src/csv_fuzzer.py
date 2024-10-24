@@ -2,7 +2,7 @@ from pwn import *
 import io
 import csv
 import copy
-from fuzzer import write_crash_output, get_process
+from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
 
 # Number of Total Mutations
 NUM_MUTATIONS = 3
@@ -60,8 +60,10 @@ def fuzz_csv(filepath, words):
 
     for i in range(0, NUM_MUTATIONS):
         deepcopy = copy.deepcopy(csv_string)
-        if perform_mutation(filepath, deepcopy, i):
-            exit()
+        print_crash_found()
+        exit()
+
+    print_no_crash_found()
 
 def perform_mutation(filepath, data, i):
     if i == 0:          # Default Payload Test

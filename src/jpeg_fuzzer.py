@@ -1,7 +1,6 @@
-import copy
 from pwn import *
-from fuzzer import write_crash_output, get_process
-from utils import print_crash_found, print_no_crash_found
+import copy
+from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
 
 '''
 Number of Total Mutations
