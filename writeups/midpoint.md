@@ -2,15 +2,20 @@
 ## Team FuzzForce
 ### Jerry Yang (z5421983) | Manav Dodia (z5417834) | Jasmin Wu (z5482839) | Isabelle Dwyer (z5413928)
 
-Your fuzzer design and functionality (around 1-2 pages)
+**Fuzzer design and functionality (around 1-2 pages)**
 
-This section should explain, in a readable manner:
 
 How your fuzzer works. Detailed description on;
 The different mutation strategies you use.
 How your harness works.
 All of your fuzzers’ capabilities
 What kinds of bugs your fuzzer can find
-What improvements can be made to your fuzzer (Be honest. We won’t dock marks for things you didn’t implement. This shows reflection and understanding)
-If you attempt any bonus marks - How your fuzzer achieves these bonus marks.
-It is insufficient if the document merely states “our fuzzer injects random values and finds bugs”. We want details that show deep understanding.
+
+
+**CSV Fuzzer:**
+The CSV Fuzzer is a fuzzer that generates random CSV files. The fuzzer uses a combination of mutation strategies to generate the CSV files.
+- Malformed CSV file: This generates a CSV file that could have missing commas, missing values, or extra commas. This is done by randomly removing commas, adding commas, or removing values.
+
+**Improvements:**
+- Add more file formats to the fuzzer. This would allow the fuzzer to test more file formats and potentially find more bugs. We need to add support for text, XML and PDF.
+- It would be good to test string format vulnerabilities and buffer overflows also.
