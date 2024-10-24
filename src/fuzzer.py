@@ -5,6 +5,8 @@ import subprocess
 import sys
 import json_fuzzer
 
+context.log_level='warn'
+
 # ANSI colors
 RESET = "\033[0m"
 GREEN = "\033[92m"

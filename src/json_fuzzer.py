@@ -1,25 +1,24 @@
 import json
 import copy
+from math import pi
 from pwn import *
 from fuzzer import write_crash_output, get_process
 
 # Number of Total Mutations
-NUM_MUTATIONS = 3
+NUM_MUTATIONS = 5
 
 # Hardcoded Values for Initial Mutation of Input
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
 MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
-OVERFLOW = "A" * 10000
-BOUNDARY_MINUS = -1
-BOUNDARY_PLUS = 1
-ZERO = 0
-ONE_BYTE = 128
-TWO_BYTE = 32768
-FOUR_BYTE = 2147483648
 EIGHT_BYTE = 9223372036854775808
-FORMAT = "%p"
+MAX_INT_32 = 2147483647
+MIN_INT_32 = -2147483648
+MAX_INT_64 = 9223372036854775807
+MIN_INT_64 = -9223372036854775808
 
-# Returns whether the given data is valid JSON or not
+'''
+Returns whether the given data is valid JSON or not
+'''
 def is_json(words):
     try:
         json.loads(words)
@@ -28,50 +27,58 @@ def is_json(words):
     
     return True
 
+'''
+Checks whether a given data is an int
+'''
+def is_num(data):
+    return isinstance(data, int)
+
+'''
+Checks whether a given data is a str
+'''
+def is_str(data):
+    return isinstance(data, str)
+
+'''
+Sends a given input to a process, then returns whether the process crashes or not
+> JSON specific <
+'''
 def send_to_process(p, payload, filepath):
     p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
     p.proc.stdin.close()
 
     code = p.poll(True)
     
-    # TODO: I'm not sure if this is the right check or not
     if code != 0:
-        write_crash_output(filepath, payload)
+        write_crash_output(filepath, json.dumps(payload))
         return True
     else:
         return False
-    
+
 '''
-    Main call when fuzzing JSON
-    The second strategy is to concentrate on finding bugs after the document has been parsed/processed. In this case 
-    we will aim to submit unexpected input but still stick to the format and the specifications of the document. This 
-    strategy is used to discover a lot wider range of bugs depending on how the structured data is used later on inside 
-    the application. The types of bugs discovered will depend on the targeted platform, language and all kinds of other 
-    things.
-
-    (MIN_INT, MAX_INT, UNSIGNED MAX_INT, LONG, etc). Unexpected input is also logical values such as true and false, 
-    the special atom nil, null and 0 and 1.
-
-    Try sending some known sample inputs (nothing, certain numbers, certain strings, etc)
-    Try parsing the format of the input (normal text, json, etc) and send correctly formatted data with fuzzed fields.
-    Try manipulating the sample input (bit flips, number replacement, etc)
+Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
     data = json.loads(words)
 
     # Endlessly loop through mutations
     for i in range(0, NUM_MUTATIONS):
-        deepcopy = copy.deepcopy(data)
-        if perform_mutation(filepath, deepcopy, i):
+        d = copy.deepcopy(data)
+        if perform_mutation(filepath, d, i):
+            print("#########################################")
+            print("######### Crashable Input Found #########")
+            print("#########################################")
             exit()
 
-    print("################################")
-    print("### No Crashable Input Found ###")
-    print("################################")
-    exit()
+    print("########################################")
+    print("####### No Crashable Input Found #######")
+    print("########################################")
 
+'''
+Begins the mutation process
+'''
 def perform_mutation(filepath, data: json, i):
-    if i == 0:          # Default Payload Test
+    if i == 0:          # Testing Default Payload
         print("> Testing Normal Payload")
         if send_to_process(get_process(filepath), data, filepath):
             return True
@@ -85,46 +92,112 @@ def perform_mutation(filepath, data: json, i):
     elif i == 3:        # Testing Removing Fields
         if (remove_fields(data, filepath)):
             return True
-    elif i == 4:
+    elif i == 4:        # Testing Mutating Num Fields
+        if (mutate_nums(data, filepath)):
+            return True
+    elif i == 5:
         print("Haven't done this yet!")
         # TODO: Continue Implementing
 
     return False
 
+'''
+Adds 1 - 10 New Fields
+'''
 def add_fields(data: json, filepath):
+    print("> Testing Adding Fields")
     for i in range(1, 11):
         p = get_process(filepath)
-        print(f"> Adding {i} Extra Field(s)")
-        deepcopy = copy.deepcopy(data)
+        print(f"  > Adding {i} Extra Field(s)")
+        d = copy.deepcopy(data)
 
         for j in range (0, i):
-            deepcopy[f"RandomField{j}"] = f"RandomValue{j}"
+            d[f"RandomField{j}"] = f"RandomValue{j}"
         
-        if send_to_process(p, deepcopy, filepath):
+        if send_to_process(p, d, filepath):
             return True
         
     return False
         
-
+'''
+Removes each of the top level JSON fields
+'''
 def remove_fields(data: json, filepath):
+    print("> Testing Removing Fields")
     keys = data.keys()  
     for i in range(0, len(keys)):
         p = get_process(filepath)
-        print(f"> Removing Field at Index {i}")
-        deepcopy = copy.deepcopy(data)
+        print(f"  > Removing Field at Index {i}")
+        d = copy.deepcopy(data)
 
         # Ghetto ass solution right now
         # TODO: Pretty sure this only removes top level keys
         j = 0
         for keyValue in keys:
             if j == i: 
-                print(f"    Deleting Field {keyValue}")
-                del deepcopy[keyValue]
+                print(f"    > Deleting Field {keyValue}")
+                del d[keyValue]
             j += 1
         
-        if send_to_process(p, deepcopy, filepath):
+        if send_to_process(p, d, filepath):
             return True
         
+    return False
+
+'''
+Mutates number fields within the JSON to different values
+'''
+def mutate_nums(data: json, filepath):
+    print("> Mutating Number Fields")
+    keys = data.keys()
+    d = copy.deepcopy(data)
+
+    for keyValue in keys:
+        if not is_num(d[keyValue]):
+            continue
+
+        for i in range(0, 100):
+            p = get_process(filepath)
+            curr = d[keyValue]
+
+            if i == 0:
+                d[keyValue] = int(curr)
+            elif i == 1:
+                d[keyValue] = MAX_INT_32
+            elif i == 2:
+                d[keyValue] = MIN_INT_32
+            elif i == 3:
+                d[keyValue] = MAX_INT_64
+            elif i == 4:
+                d[keyValue] = MIN_INT_64
+            elif i == 5:
+                d[keyValue] = MAX_INT_32 + 1
+            elif i == 6:
+                d[keyValue] = MIN_INT_32 - 1
+            elif i == 7:
+                d[keyValue] = MAX_INT_64 + 1
+            elif i == 8:
+                d[keyValue] = MIN_INT_64 - 1
+            elif i == 9:
+                d[keyValue] = pi
+            elif i == 10:
+                d[keyValue] = curr * 1.0
+            elif i == 11:
+                d[keyValue] = curr * -1
+            elif i == 12:
+                d[keyValue] = str(curr)
+            elif i == 13:
+                d[keyValue] = MASS_POS_NUM
+            elif i == 14:
+                d[keyValue] = MASS_NEG_NUM
+            else:
+                break
+
+            print(f"  > Mutating {keyValue} with {d[keyValue]}")
+
+            if (send_to_process(p, d, filepath)):
+                return True
+
     return False
 
 # Mutate int inputs with defines
