@@ -1,6 +1,7 @@
 import copy
 from pwn import *
 from fuzzer import write_crash_output, get_process
+from utils import print_crash_found, print_no_crash_found
 
 '''
 Number of Total Mutations
@@ -94,14 +95,10 @@ def fuzz_jpeg(filepath, words):
     for i in range(0, NUM_MUTATIONS):
         d = copy.deepcopy(words)
         if perform_mutation(filepath, d, i):
-            print("#########################################")
-            print("######### Crashable Input Found #########")
-            print("#########################################")
+            print_crash_found()
             exit()
 
-    print("########################################")
-    print("####### No Crashable Input Found #######")
-    print("########################################")
+    print_no_crash_found()
 
 '''
 Begins the mutation process

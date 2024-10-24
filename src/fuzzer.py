@@ -59,4 +59,4 @@ if __name__ == "__main__":
         jpeg_fuzzer.fuzz_jpeg(filepath, words)
 
     # Other filetype checks
-    print("Not a JSON File")
+    print("No current supported fuzzing input has been detected!")
