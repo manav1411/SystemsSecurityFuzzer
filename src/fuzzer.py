@@ -5,6 +5,7 @@ import subprocess
 import sys
 import json_fuzzer
 import csv_fuzzer
+import jpeg_fuzzer
 
 context.log_level='warn'
 
@@ -53,7 +54,14 @@ if __name__ == "__main__":
     if json_fuzzer.is_json(words):
         print("Found JSON Input > Fuzzing")
         json_fuzzer.fuzz_json(filepath, words)
+    
+    if jpeg_fuzzer.is_jpeg(words):
+        print("Found JPEG Input > Fuzzing")
+        jpeg_fuzzer.fuzz_jpeg(filepath, words)
 
     if csv_fuzzer.is_csv(words):
         print("Found CSV Input  > Fuzzing")
         csv_fuzzer.fuzz_csv(filepath, words)
+        
+    # Other filetype checks
+    print("No current supported fuzzing input has been detected!")
