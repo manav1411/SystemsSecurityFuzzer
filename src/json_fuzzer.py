@@ -60,8 +60,6 @@ Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
     data = json.loads(words)
-
-    # Endlessly loop through mutations
     for i in range(0, NUM_MUTATIONS):
         d = copy.deepcopy(data)
         if perform_mutation(filepath, d, i):
@@ -95,11 +93,10 @@ def perform_mutation(filepath, data: json, i):
     elif i == 4:        # Testing Mutating Num Fields
         if (mutate_nums(data, filepath)):
             return True
-    elif i == 5:
+    else:   
         print("Haven't done this yet!")
         # TODO: Continue Implementing
-
-    return False
+        return False
 
 '''
 Adds 1 - 10 New Fields
