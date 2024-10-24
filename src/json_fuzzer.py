@@ -15,6 +15,8 @@ MAX_INT_32 = 2147483647
 MIN_INT_32 = -2147483648
 MAX_INT_64 = 9223372036854775807
 MIN_INT_64 = -9223372036854775808
+MAX_UNSIGNED_64 = 18446744073709551615
+MAX_UNSIGNED_32 = 4294967295
 
 '''
 Returns whether the given data is valid JSON or not
@@ -108,8 +110,8 @@ def add_fields(data: json, filepath):
     print("> Testing Adding Fields")
     for i in range(1, 11):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Field(s)")
         d = copy.deepcopy(data)
+        print(f"  > Adding {i} Extra Field(s)")
 
         for j in range (0, i):
             d[f"RandomField{j}"] = f"RandomValue{j}"
@@ -127,8 +129,8 @@ def remove_fields(data: json, filepath):
     keys = data.keys()  
     for i in range(0, len(keys)):
         p = get_process(filepath)
-        print(f"  > Removing Field at Index {i}")
         d = copy.deepcopy(data)
+        print(f"  > Removing Field at Index {i}")
 
         # Ghetto ass solution right now
         # TODO: Pretty sure this only removes top level keys
@@ -150,14 +152,14 @@ Mutates number fields within the JSON to different values
 def mutate_nums(data: json, filepath):
     print("> Mutating Number Fields")
     keys = data.keys()
-    d = copy.deepcopy(data)
 
     for keyValue in keys:
-        if not is_num(d[keyValue]):
+        if not is_num(data[keyValue]):
             continue
 
         for i in range(0, 100):
             p = get_process(filepath)
+            d = copy.deepcopy(data)
             curr = d[keyValue]
 
             if i == 0:
@@ -190,6 +192,14 @@ def mutate_nums(data: json, filepath):
                 d[keyValue] = MASS_POS_NUM
             elif i == 14:
                 d[keyValue] = MASS_NEG_NUM
+            elif i == 15:
+                d[keyValue] = MAX_UNSIGNED_64
+            elif i == 16:
+                d[keyValue] = MAX_UNSIGNED_32
+            elif i == 17:
+                d[keyValue] = MAX_UNSIGNED_64 + 1
+            elif i == 18:
+                d[keyValue] = MAX_UNSIGNED_32 + 1
             else:
                 break
 
@@ -200,8 +210,122 @@ def mutate_nums(data: json, filepath):
 
     return False
 
-# Mutate int inputs with defines
-# Mutate string inputs with defines
-# Flip Bits
-# Swap Types
-# Mutate Strings
+'''
+Mutates string fields within the JSON to different values
+>> TODO TODO TODO <<<
+'''
+def mutate_strs(data: json, filepath):
+    print("> Mutating String Fields")
+    keys = data.keys()
+
+    for keyValue in keys:
+        if not is_str(data[keyValue]):
+            continue
+
+        for i in range(0, 100):
+            p = get_process(filepath)
+            d = copy.deepcopy(data)
+            curr = d[keyValue]
+
+            if i == 0:
+                d[keyValue] = '' # TODO
+            else:
+                break
+
+            print(f"  > Mutating {keyValue} with {d[keyValue]}")
+
+            if (send_to_process(p, d, filepath)):
+                return True
+
+    return False
+
+'''
+Mutates the data by flipping bits within the JSON
+>> TODO TODO TODO <<<
+'''
+def flip_bits(data: json, filepath):
+    print("> Causing Bit Flips")
+    keys = data.keys()
+
+    for keyValue in keys:
+        if not is_str(data[keyValue]):
+            continue
+
+        for i in range(0, 100):
+            p = get_process(filepath)
+            d = copy.deepcopy(data)
+            curr = d[keyValue]
+
+            if i == 0:
+                d[keyValue] = '' # TODO
+            else:
+                break
+
+            print(f"  > Mutating {keyValue} with {d[keyValue]}")
+
+            if (send_to_process(p, d, filepath)):
+                return True
+
+    return False
+
+'''
+Mutates the data by swapping the types of JSON fields
+>> TODO TODO TODO <<<
+'''
+def swap_types(data: json, filepath):
+    print("> Swapping Field Types")
+    keys = data.keys()
+
+    for keyValue in keys:
+        if not is_str(data[keyValue]):
+            continue
+
+        for i in range(0, 100):
+            p = get_process(filepath)
+            d = copy.deepcopy(data)
+            curr = d[keyValue]
+
+            if i == 0:
+                d[keyValue] = '' # TODO
+            else:
+                break
+            
+            print(f"  > Mutating {keyValue} with {d[keyValue]}")
+            print(f"    > Changing {type(curr)} to {type(d[keyValue])}")
+
+            if (send_to_process(p, d, filepath)):
+                return True
+
+    return False
+
+'''
+Mutates the raw JSON
+>> TODO TODO TODO <<<
+'''
+def mutate_raw_json(data: json, filepath):
+    print("> Swapping Field Types")
+
+    for i in range(0, 100):
+        p = get_process(filepath)
+        raw = json.dumps(copy.deepcopy(data)).encode('utf-8')
+
+        if i == 0:
+            raw = '' # TODO
+        else:
+            break
+        
+        print(f"  > Mutating JSON Raw to: {raw}")
+
+        # As it is the raw input can't use the normal send_payload function
+        p.sendline(raw)
+        p.proc.stdin.close()
+
+        code = p.poll(True)
+        
+        if code != 0:
+            write_crash_output(filepath, raw)
+            return True
+        else:
+            continue
+
+    return False
