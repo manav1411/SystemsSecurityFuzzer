@@ -193,6 +193,9 @@ def perform_mutation(filepath, data, i):
     elif i == 10:
         if mutate_strings(data, filepath):
             return True
+    elif i == 10:
+        if stack_smash(filepath, 250):
+            return True
     else:
         return False
 
@@ -358,6 +361,7 @@ def flip_bits(data: list, filepath, numflips):
                         return True
     return False
 
+
 def mutate_strings(data: list, filepath):
     width = len(data[0])
     height = len(data)
@@ -374,8 +378,6 @@ def mutate_strings(data: list, filepath):
                     d[i][j] = rand
                     if send_to_process(p, d, filepath):
                         return True
-
-                
     return False
 
 def mutate_index(data: list, filepath):
@@ -421,15 +423,39 @@ def mutate_index(data: list, filepath):
 def replace_random_with_value(string, replacement):
     if not string:  # If the string is empty, return it as-is
         return string
-    
+
     # Convert the string to a list of characters to modify it
     string_list = list(string)
-    
+
     # Select a random index
     random_index = random.randint(0, len(string_list) - 1)
-    
+
     # Replace the character at the selected index with '\0'
     string_list[random_index] = replacement
-    
+
     # Join the list back into a string and return it
     return ''.join(string_list)
+
+
+'''
+attempts to stack smash the binary with %p
+'''
+def stack_smash(filepath, p_count):
+
+    # Create the payload with %p p_count times in each row, repeated 20 times.
+    payload1 = ['header,' + 'must,' + 'stay,' + 'intact']
+    payload2 = ['%p'*p_count, '%p'*p_count, '%p'*p_count, '%p'*p_count] * 20
+    payload3 = ['%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2]
+
+    # Combine the three payloads
+    final_payload = [payload1, payload2, payload3]
+
+    # Print the payload for debugging purposes
+    print(f"Payload: {final_payload}")
+
+    # Initialize the process
+    p = get_process(filepath)
+
+    #call send_to_process with the payload.
+
+    return False
