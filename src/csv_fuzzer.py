@@ -2,10 +2,12 @@ from pwn import *
 import io
 import csv
 import copy
+import random
+import string
 from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
 
 # Number of Total Mutations
-NUM_MUTATIONS = 3
+NUM_MUTATIONS = 10
 
 def is_csv(words):
     try:
@@ -56,7 +58,7 @@ def list_to_csv(data):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(p, csv_payload, filepath):
-    payload = ''
+    payload = list_to_csv(csv_payload)
     p.sendline(payload)
     p.proc.stdin.close()
 
@@ -72,11 +74,7 @@ def send_to_process(p, csv_payload, filepath):
 Main function call to begin fuzzing CSV input binaries
 '''
 def fuzz_csv(filepath, words):
-    print(words)
     csv_list = csv_to_list(words)
-    print(csv_list)
-    csv_back_to_csv = list_to_csv(csv_list)
-    print(csv_back_to_csv)
 
     for i in range(0, NUM_MUTATIONS):
         deepcopy = copy.deepcopy(csv_list)
@@ -93,35 +91,82 @@ Begins the mutation process with a range of CSV files
 def perform_mutation(filepath, data, i):
     if i == 0:
         print("> Testing Normal Payload")
-        return send_to_process(get_process(filepath), data, filepath)
+        if send_to_process(get_process(filepath), data, filepath):
+            return True
     elif i == 1:
         print("> Testing Empty Payload")
-        return send_to_process(get_process(filepath), "", filepath)
+        if send_to_process(get_process(filepath), "", filepath):
+            return True
     elif i == 2:
-        return add_extra_comma(data, filepath)
+        if add_rows(data, filepath):
+            return True
+    elif i == 3:
+        if add_cols(data, filepath):
+            return True
+    elif i == 4:
+        if add_cols_and_rows(data, filepath):
+            return True
     else:
         return False
 
-
-def add_extra_comma(data: csv, filepath):
-    print("> Testing Adding Comma")
+'''
+Adds 1 - 10 New Rows
+'''
+def add_rows(data: list, filepath):
+    print("> Testing Adding Rows")
+    d = copy.deepcopy(data)
+    rowlen = len(d[0])
     for i in range(1, 11):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Field(s)")
-        d = copy.deepcopy(data)
+        print(f"  > Adding {i} Extra Row(s)")
+        
+        row = []
+        for i in range(0, rowlen):
+            row.append(random.choice(string.ascii_letters))
 
-        csv_output = io.StringIO()
-        csvwriter = csv.writer(csv_output)
+        d.append(row)
 
-        # Write all original data to the new CSV output
+        if send_to_process(p, d, filepath):
+            return True
+
+    return False
+
+'''
+Adds 1 - 10 New Cols
+'''
+def add_cols(data: list, filepath):
+    print("> Testing Adding Columns")
+    d = copy.deepcopy(data)
+    for i in range(1, 11):
+        p = get_process(filepath)
+        print(f"  > Adding {i} Extra Col(s)")
+
         for row in d:
-            csvwriter.writerow(row)
+            row.append(random.choice(string.ascii_letters))
+        
+        if send_to_process(p, d, filepath):
+            return True
 
-        new_row = [str(i)] * i  # Creates a row like ['1', '1', ..., '1']
-        new_row.extend([","] * i)  # Add 3 extra commas (i.e. empty fields)
-        csvwriter.writerow(new_row)  # Write the new row to the CSV
+    return False
 
-        csv_output.close()
+'''
+Adds both extra rows and columns at the same time
+'''
+def add_cols_and_rows(data: list, filepath):
+    print("> Testing Adding Rows and Columns")
+    d = copy.deepcopy(data)
+    for i in range(1, 11):
+        print(f"  > Adding {i} Extra Cols with {i} Extra Rows")
+        p = get_process(filepath)
+        for row in d:
+            row.append(random.choice(string.ascii_letters))
+
+        rowlen = len(d[0])
+        newrow = []
+        for j in range(0, rowlen):
+            newrow.append(random.choice(string.ascii_letters))
+
+        d.append(newrow)
 
         if send_to_process(p, d, filepath):
             return True
