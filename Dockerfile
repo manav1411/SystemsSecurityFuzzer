@@ -1,10 +1,16 @@
 # Start from a default ubuntu image.
 FROM ubuntu:22.04
+FROM python:latest
 
 # Copy/Compile my fuzzer
-COPY fuzzer /
-RUN chmod +x /fuzzer
+COPY fuzzer.py /
+ADD binaries /binaries
+ADD example_inputs /example_inputs
+ADD src /src
+RUN chmod +x /binaries/*
+
+# Install all dependencies
+RUN pip install --upgrade pwntools
 
 # Run it.
-CMD ["/bin/bash", "/fuzzer"]
-
+CMD ["python3", "./fuzzer.py"]
