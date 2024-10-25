@@ -5,7 +5,7 @@ import copy
 import random
 import string
 from math import pi
-from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output, is_num, is_str
+from utils import *
 
 # Number of Total Mutations
 NUM_MUTATIONS = 10
@@ -87,6 +87,9 @@ def send_to_process(p, csv_payload, filepath):
 
     code = p.poll(True)
 
+    if code is None:
+        print("Hang or Infinite Loop Detected. Terminating")
+        return False
     if code != 0:
         write_crash_output(filepath, payload)
         return True
@@ -153,6 +156,9 @@ def perform_mutation(filepath, data, i):
             return True
     elif i == 7:
         if mutate_delimiters(data, filepath):
+            return True
+    elif i == 8:
+        if flip_bits(data, filepath, 50):
             return True
     else:
         return False
@@ -292,3 +298,30 @@ def mutate_delimiters(data: list, filepath):
 
         if send_to_process_newdelim(p, d, filepath, delim):
             return True
+
+def flip_bits(data: list, filepath, numflips):
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                curr = d[i][j]
+
+                if is_str(curr):
+                    bits = ustring_to_bits(curr)
+                else:
+                    bits = unumber_to_bits(curr)
+
+                for num in range(0, numflips):
+                    flipped = uflip_bits(bits)
+                    back_to_string = ubits_to_string(flipped)
+
+                    print(f"Bit Flipping (Iter: {num}): {d[i][j]} to {back_to_string}")
+                    d[i][j] = back_to_string
+
+                    p = get_process(filepath)
+                    if send_to_process(p, d, filepath):
+                        return True
+    return False
+                

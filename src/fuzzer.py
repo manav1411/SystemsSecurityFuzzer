@@ -38,14 +38,17 @@ if __name__ == "__main__":
     if json_fuzzer.is_json(words):
         print("Found JSON Input > Fuzzing")
         json_fuzzer.fuzz_json(filepath, words)
+        exit()
     
     if jpeg_fuzzer.is_jpeg(words):
         print("Found JPEG Input > Fuzzing")
         jpeg_fuzzer.fuzz_jpeg(filepath, words)
+        exit()
 
     if csv_fuzzer.is_csv(words):
         print("Found CSV Input  > Fuzzing")
         csv_fuzzer.fuzz_csv(filepath, words)
+        exit()
 
     # Other filetype checks
     print("No current supported fuzzing input has been detected!")
