@@ -25,6 +25,13 @@ num_mutations_arr = [
     MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
 ]
 
+delimiters_mutations_arr = [
+    "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
+    "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
+    "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
+    "}", "[", "]", "\"", "\'", 
+]
+
 def is_csv(words):
     try:
         csv.reader(words)
@@ -61,12 +68,12 @@ e,f,g,ecr
 i,j,k,et
 
 '''
-def list_to_csv(data):
+def list_to_csv(data, delimiter=','):
     csv = ''
     for row in data:
         newline = ''
         for ele in row:
-            newline += f'{ele},'
+            newline += f'{ele}' + delimiter
         csv += f'{newline[:-1]}\n'
     return csv + '\n'
 
@@ -74,7 +81,23 @@ def list_to_csv(data):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(p, csv_payload, filepath):
-    payload = list_to_csv(csv_payload)
+    payload = list_to_csv(csv_payload, ',')
+    p.sendline(payload)
+    p.proc.stdin.close()
+
+    code = p.poll(True)
+
+    if code != 0:
+        write_crash_output(filepath, payload)
+        return True
+    else:
+        return False
+    
+'''
+Sends a given input to a process, then returns whether the process crashes or not
+'''
+def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
+    payload = list_to_csv(csv_payload, delimiter)
     p.sendline(payload)
     p.proc.stdin.close()
 
@@ -124,6 +147,12 @@ def perform_mutation(filepath, data, i):
             return True
     elif i == 5:
         if mutate_data_ints(data, filepath):
+            return True
+    elif i == 6:
+        if mutate_data_values_with_delimiters(data, filepath):
+            return True
+    elif i == 7:
+        if mutate_delimiters(data, filepath):
             return True
     else:
         return False
@@ -234,3 +263,32 @@ def mutate_data_ints(data: list, filepath):
                     if send_to_process(p, d, filepath):
                         return True 
     return False
+
+'''
+Changes every cell in the CSV to all defined delimiter values
+'''
+def mutate_data_values_with_delimiters(data: list, filepath):
+    print("> Testing Mutating Cell Values to Different Delimiters")
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                for delim in delimiters_mutations_arr:
+                    d = copy.deepcopy(data)
+                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {delim}")
+                    p = get_process(filepath)
+                    d[i][j] = delim
+            
+                    if send_to_process(p, d, filepath):
+                        return True 
+    return False
+
+def mutate_delimiters(data: list, filepath):
+    for delim in delimiters_mutations_arr:
+        d = copy.deepcopy(data)
+        print(f"Replacing delimiters with {delim}")
+        p = get_process(filepath)
+
+        if send_to_process_newdelim(p, d, filepath, delim):
+            return True
