@@ -4,13 +4,14 @@ import csv
 import copy
 import random
 import string
+import signal
 from math import pi
 from utils import *
 
 # Number of Total Mutations
 NUM_MUTATIONS = 10
 
-# Defines for Mutations 
+# Defines for Mutations
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
 MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
 EIGHT_BYTE = 9223372036854775808
@@ -25,11 +26,14 @@ num_mutations_arr = [
     MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
 ]
 
+MASSIVE_STRING = 'A' * 10000
+MASSIVE_P_STRING = '%P' * 10000
+
 delimiters_mutations_arr = [
     "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
     "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
     "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
-    "}", "[", "]", "\"", "\'", 
+    "}", "[", "]", "\"", "\'", "\0"
 ]
 
 def is_csv(words):
@@ -47,7 +51,7 @@ a,b,c,S
 e,f,g,ecr
 i,j,k,et
 
--> 
+->
 [['header', 'must', 'stay', 'intact'], ['a', 'b', 'c', 'S'], ['e', 'f', 'g', 'ecr'], ['i', 'j', 'k', 'et']]
 '''
 def csv_to_list(data):
@@ -85,17 +89,29 @@ def send_to_process(p, csv_payload, filepath):
     p.sendline(payload)
     p.proc.stdin.close()
 
-    code = p.poll(True)
+    code = p.poll(block=True)
+    p.close()
 
     if code is None:
         print("Hang or Infinite Loop Detected. Terminating")
+        write_crash_output(filepath, payload)
         return False
     if code != 0:
         write_crash_output(filepath, payload)
         return True
+    '''
+    Irteza Chaudhry
+    Yes, stack smashing is potentially exploitable
+
+    Adam Tanana
+    Yes. From stack smashing. Since that's potentially exploitable
+    '''
+    if code == signal.SIGABRT:
+        write_crash_output(filepath, payload)
+        return True
     else:
         return False
-    
+
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
@@ -105,6 +121,7 @@ def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
     p.proc.stdin.close()
 
     code = p.poll(True)
+    p.close()
 
     if code != 0:
         write_crash_output(filepath, payload)
@@ -161,6 +178,9 @@ def perform_mutation(filepath, data, i):
         if flip_bits(data, filepath, 50):
             return True
     elif i == 9:
+        if mutate_strings(data, filepath):
+            return True
+    elif i == 10:
         if stack_smash(filepath, 250):
             return True
     else:
@@ -173,10 +193,10 @@ def add_rows(data: list, filepath):
     print("> Testing Adding Rows")
     d = copy.deepcopy(data)
     rowlen = len(d[0])
-    for i in range(1, 11):
+    for i in range(1, 101):
         p = get_process(filepath)
         print(f"  > Adding {i} Extra Row(s)")
-        
+
         row = []
         for i in range(0, rowlen):
             row.append(random.choice(string.ascii_letters))
@@ -194,13 +214,13 @@ Adds 1 - 10 New Cols
 def add_cols(data: list, filepath):
     print("> Testing Adding Columns")
     d = copy.deepcopy(data)
-    for i in range(1, 11):
+    for i in range(1, 101):
         p = get_process(filepath)
         print(f"  > Adding {i} Extra Col(s)")
 
         for row in d:
             row.append(random.choice(string.ascii_letters))
-        
+
         if send_to_process(p, d, filepath):
             return True
 
@@ -212,7 +232,7 @@ Adds both extra rows and columns at the same time
 def add_cols_and_rows(data: list, filepath):
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
-    for i in range(1, 11):
+    for i in range(1, 101):
         print(f"  > Adding {i} Extra Cols with {i} Extra Rows")
         p = get_process(filepath)
         for row in d:
@@ -245,10 +265,10 @@ def mutate_data_ints(data: list, filepath):
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {num}")
                     p = get_process(filepath)
                     d[i][j] = num
-            
+
                     if send_to_process(p, d, filepath):
-                        return True 
-                
+                        return True
+
                 for x in range(0, 10):
                     if not is_num(data[i][j]):
                         continue
@@ -267,10 +287,10 @@ def mutate_data_ints(data: list, filepath):
                     else:
                         p.proc.stdin.close()
                         break
-                        
+
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {d[i][j]}")
                     if send_to_process(p, d, filepath):
-                        return True 
+                        return True
     return False
 
 '''
@@ -288,9 +308,9 @@ def mutate_data_values_with_delimiters(data: list, filepath):
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {delim}")
                     p = get_process(filepath)
                     d[i][j] = delim
-            
+
                     if send_to_process(p, d, filepath):
-                        return True 
+                        return True
     return False
 
 def mutate_delimiters(data: list, filepath):
@@ -329,6 +349,40 @@ def flip_bits(data: list, filepath, numflips):
     return False
 
 
+def mutate_strings(data: list, filepath):
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                curr = d[i][j]
+
+                for delim in delimiters_mutations_arr:
+                    p = get_process(filepath)
+                    rand = replace_random_with_value(curr, delim)
+                    print(f"Replacing {i}:{j} with {rand}")
+                    d[i][j] = rand
+                    if send_to_process(p, d, filepath):
+                        return True
+    return False
+
+
+def replace_random_with_value(string, replacement):
+    if not string:  # If the string is empty, return it as-is
+        return string
+
+    # Convert the string to a list of characters to modify it
+    string_list = list(string)
+
+    # Select a random index
+    random_index = random.randint(0, len(string_list) - 1)
+
+    # Replace the character at the selected index with '\0'
+    string_list[random_index] = replacement
+
+    # Join the list back into a string and return it
+    return ''.join(string_list)
 
 
 '''

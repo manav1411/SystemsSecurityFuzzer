@@ -15,6 +15,8 @@ if __name__ == "__main__":
         print("Usage: python3 src/fuzzer.py [binaryname] [sampleinput.txt]")
         exit()
 
+    print(f"Running Binary: {sys.argv[1]}")
+
     filepath = './binaries/' + sys.argv[1] # Binary Name
     inputpath = './example_inputs/' + sys.argv[2] # Test Input Name
 
