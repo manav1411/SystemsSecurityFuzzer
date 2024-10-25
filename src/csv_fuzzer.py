@@ -5,11 +5,13 @@ import copy
 import random
 import string
 import signal
+import datetime
+import store
 from math import pi
 from utils import *
 
 # Number of Total Mutations
-NUM_MUTATIONS = 10
+NUM_MUTATIONS = 100
 
 # Defines for Mutations
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -89,13 +91,21 @@ def send_to_process(p, csv_payload, filepath):
     p.sendline(payload)
     p.proc.stdin.close()
 
+    TIMEOUT = 1500; 
+    startTime = datetime.datetime.now();
+    
     code = p.poll(block=True)
+
+    while code is None:
+        elapsed = datetime.datetime.now() - startTime;
+        if (elapsed >= TIMEOUT):
+            write_crash_output(filepath, payload)
+            print("PROGRAM HUNG")
+            break
+        code = p.poll(block=True)
+
     p.close()
 
-    if code is None:
-        print("Hang or Infinite Loop Detected. Terminating")
-        write_crash_output(filepath, payload)
-        return False
     if code != 0:
         write_crash_output(filepath, payload)
         return True
@@ -178,6 +188,9 @@ def perform_mutation(filepath, data, i):
         if flip_bits(data, filepath, 50):
             return True
     elif i == 9:
+        if mutate_index(data, filepath):
+            return True
+    elif i == 10:
         if mutate_strings(data, filepath):
             return True
     else:
@@ -365,6 +378,45 @@ def mutate_strings(data: list, filepath):
                 
     return False
 
+def mutate_index(data: list, filepath):
+    print("Sending Payload")
+    payload = store.getPay()
+    p = get_process(filepath)
+    
+    p.sendline(payload)
+    p.proc.stdin.close()
+
+    TIMEOUT = 1500; 
+    startTime = datetime.datetime.now()
+    
+    code = p.poll(block=True)
+
+    while code is None:
+        elapsed = datetime.datetime.now() - startTime
+        if (elapsed >= TIMEOUT):
+            write_crash_output(filepath, payload)
+            print("PROGRAM HUNG")
+            break
+        code = p.poll(block=True)
+
+    p.close()
+
+    if code != 0:
+        write_crash_output(filepath, payload)
+        return True
+    '''
+    Irteza Chaudhry
+    Yes, stack smashing is potentially exploitable
+
+    Adam Tanana
+    Yes. From stack smashing. Since that's potentially exploitable
+    '''
+    if code == signal.SIGABRT:
+        write_crash_output(filepath, payload)
+        return True
+    else:
+        return False
+    
 
 def replace_random_with_value(string, replacement):
     if not string:  # If the string is empty, return it as-is
