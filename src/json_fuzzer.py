@@ -2,12 +2,12 @@ from pwn import *
 import json
 import copy
 from math import pi
-from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
+from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output, is_num, is_str
 
 # Number of Total Mutations
 NUM_MUTATIONS = 5
 
-# Hardcoded Values for Initial Mutation of Input
+# Defines for Mutations 
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
 MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
 EIGHT_BYTE = 9223372036854775808
@@ -15,6 +15,12 @@ MAX_INT_32 = 2147483647
 MIN_INT_32 = -2147483648
 MAX_INT_64 = 9223372036854775807
 MIN_INT_64 = -9223372036854775808
+
+num_mutations_arr = [
+    MASS_NEG_NUM, MASS_POS_NUM, EIGHT_BYTE, MAX_INT_32,
+    MAX_INT_64, MIN_INT_32, MIN_INT_64, MAX_INT_32 + 1,
+    MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
+]
 
 '''
 Returns whether the given data is valid JSON or not
@@ -26,18 +32,6 @@ def is_json(words):
         return False
     
     return True
-
-'''
-Checks whether a given data is an int
-'''
-def is_num(data):
-    return isinstance(data, int)
-
-'''
-Checks whether a given data is a str
-'''
-def is_str(data):
-    return isinstance(data, str)
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
@@ -143,51 +137,38 @@ Mutates number fields within the JSON to different values
 def mutate_nums(data: json, filepath):
     print("> Mutating Number Fields")
     keys = data.keys()
-    d = copy.deepcopy(data)
 
     for keyValue in keys:
-        if not is_num(d[keyValue]):
+        if not is_num(data[keyValue]):
             continue
 
-        for i in range(0, 100):
+        for num in num_mutations_arr:
+            d = copy.deepcopy(data)
+            p = get_process(filepath)
+            d[keyValue] = num
+
+            print(f"  > Mutating {keyValue} with {d[keyValue]}")
+            if (send_to_process(p, d, filepath)):
+                return True
+
+        for i in range(0, 10):
+            d = copy.deepcopy(data)
             p = get_process(filepath)
             curr = d[keyValue]
 
             if i == 0:
                 d[keyValue] = int(curr)
             elif i == 1:
-                d[keyValue] = MAX_INT_32
-            elif i == 2:
-                d[keyValue] = MIN_INT_32
-            elif i == 3:
-                d[keyValue] = MAX_INT_64
-            elif i == 4:
-                d[keyValue] = MIN_INT_64
-            elif i == 5:
-                d[keyValue] = MAX_INT_32 + 1
-            elif i == 6:
-                d[keyValue] = MIN_INT_32 - 1
-            elif i == 7:
-                d[keyValue] = MAX_INT_64 + 1
-            elif i == 8:
-                d[keyValue] = MIN_INT_64 - 1
-            elif i == 9:
-                d[keyValue] = pi
-            elif i == 10:
                 d[keyValue] = curr * 1.0
-            elif i == 11:
+            elif i == 2:
                 d[keyValue] = curr * -1
-            elif i == 12:
+            elif i == 3:
                 d[keyValue] = str(curr)
-            elif i == 13:
-                d[keyValue] = MASS_POS_NUM
-            elif i == 14:
-                d[keyValue] = MASS_NEG_NUM
             else:
+                p.proc.stdin.close()
                 break
 
             print(f"  > Mutating {keyValue} with {d[keyValue]}")
-
             if (send_to_process(p, d, filepath)):
                 return True
 

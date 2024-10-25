@@ -4,10 +4,26 @@ import csv
 import copy
 import random
 import string
-from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
+from math import pi
+from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output, is_num, is_str
 
 # Number of Total Mutations
 NUM_MUTATIONS = 10
+
+# Defines for Mutations 
+MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
+MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
+EIGHT_BYTE = 9223372036854775808
+MAX_INT_32 = 2147483647
+MIN_INT_32 = -2147483648
+MAX_INT_64 = 9223372036854775807
+MIN_INT_64 = -9223372036854775808
+
+num_mutations_arr = [
+    MASS_NEG_NUM, MASS_POS_NUM, EIGHT_BYTE, MAX_INT_32,
+    MAX_INT_64, MIN_INT_32, MIN_INT_64, MAX_INT_32 + 1,
+    MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
+]
 
 def is_csv(words):
     try:
@@ -106,6 +122,9 @@ def perform_mutation(filepath, data, i):
     elif i == 4:
         if add_cols_and_rows(data, filepath):
             return True
+    elif i == 5:
+        if mutate_data_ints(data, filepath):
+            return True
     else:
         return False
 
@@ -171,4 +190,47 @@ def add_cols_and_rows(data: list, filepath):
         if send_to_process(p, d, filepath):
             return True
 
+    return False
+
+'''
+Changes every cell in the CSV to all defined num values
+'''
+def mutate_data_ints(data: list, filepath):
+    print("> Testing Mutating Cell Values to Different Numbers")
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                for num in num_mutations_arr:
+                    d = copy.deepcopy(data)
+                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {num}")
+                    p = get_process(filepath)
+                    d[i][j] = num
+            
+                    if send_to_process(p, d, filepath):
+                        return True 
+                
+                for x in range(0, 10):
+                    if not is_num(data[i][j]):
+                        continue
+                    d = copy.deepcopy(data)
+                    p = get_process(filepath)
+                    curr = d[i][j]
+
+                    if x == 0:
+                        d[i][j] = int(curr)
+                    elif x == 1:
+                        d[i][j] = curr * 1.0
+                    elif x == 2:
+                        d[i][j] = curr * -1
+                    elif x == 3:
+                        d[i][j] = str(curr)
+                    else:
+                        p.proc.stdin.close()
+                        break
+                        
+                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {d[i][j]}")
+                    if send_to_process(p, d, filepath):
+                        return True 
     return False

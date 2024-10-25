@@ -21,3 +21,16 @@ def print_no_crash_found():
     print("#########################################")
     print("####### No Crashable  Input Found #######")
     print("#########################################")
+
+
+'''
+Checks whether a given data is an int
+'''
+def is_num(data):
+    return isinstance(data, int)
+
+'''
+Checks whether a given data is a str
+'''
+def is_str(data):
+    return isinstance(data, str)
