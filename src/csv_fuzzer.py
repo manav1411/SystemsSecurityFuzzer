@@ -4,6 +4,7 @@ import csv
 import copy
 import random
 import string
+import signal
 from math import pi
 from utils import *
 
@@ -25,11 +26,14 @@ num_mutations_arr = [
     MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
 ]
 
+MASSIVE_STRING = 'A' * 10000
+MASSIVE_P_STRING = '%P' * 10000
+
 delimiters_mutations_arr = [
     "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
     "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
     "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
-    "}", "[", "]", "\"", "\'", 
+    "}", "[", "]", "\"", "\'", "\0"
 ]
 
 def is_csv(words):
@@ -85,12 +89,24 @@ def send_to_process(p, csv_payload, filepath):
     p.sendline(payload)
     p.proc.stdin.close()
 
-    code = p.poll(True)
+    code = p.poll(block=True)
+    p.close()
 
     if code is None:
         print("Hang or Infinite Loop Detected. Terminating")
+        write_crash_output(filepath, payload)
         return False
     if code != 0:
+        write_crash_output(filepath, payload)
+        return True
+    '''
+    Irteza Chaudhry
+    Yes, stack smashing is potentially exploitable
+
+    Adam Tanana
+    Yes. From stack smashing. Since that's potentially exploitable
+    '''
+    if code == signal.SIGABRT:
         write_crash_output(filepath, payload)
         return True
     else:
@@ -160,6 +176,9 @@ def perform_mutation(filepath, data, i):
     elif i == 8:
         if flip_bits(data, filepath, 50):
             return True
+    elif i == 9:
+        if mutate_strings(data, filepath):
+            return True
     else:
         return False
 
@@ -170,7 +189,7 @@ def add_rows(data: list, filepath):
     print("> Testing Adding Rows")
     d = copy.deepcopy(data)
     rowlen = len(d[0])
-    for i in range(1, 11):
+    for i in range(1, 101):
         p = get_process(filepath)
         print(f"  > Adding {i} Extra Row(s)")
         
@@ -191,7 +210,7 @@ Adds 1 - 10 New Cols
 def add_cols(data: list, filepath):
     print("> Testing Adding Columns")
     d = copy.deepcopy(data)
-    for i in range(1, 11):
+    for i in range(1, 101):
         p = get_process(filepath)
         print(f"  > Adding {i} Extra Col(s)")
 
@@ -209,7 +228,7 @@ Adds both extra rows and columns at the same time
 def add_cols_and_rows(data: list, filepath):
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
-    for i in range(1, 11):
+    for i in range(1, 101):
         print(f"  > Adding {i} Extra Cols with {i} Extra Rows")
         p = get_process(filepath)
         for row in d:
@@ -324,4 +343,40 @@ def flip_bits(data: list, filepath, numflips):
                     if send_to_process(p, d, filepath):
                         return True
     return False
+
+def mutate_strings(data: list, filepath):
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                curr = d[i][j]
+
+                for delim in delimiters_mutations_arr:
+                    p = get_process(filepath)
+                    rand = replace_random_with_value(curr, delim)
+                    print(f"Replacing {i}:{j} with {rand}")
+                    d[i][j] = rand
+                    if send_to_process(p, d, filepath):
+                        return True
+
                 
+    return False
+
+
+def replace_random_with_value(string, replacement):
+    if not string:  # If the string is empty, return it as-is
+        return string
+    
+    # Convert the string to a list of characters to modify it
+    string_list = list(string)
+    
+    # Select a random index
+    random_index = random.randint(0, len(string_list) - 1)
+    
+    # Replace the character at the selected index with '\0'
+    string_list[random_index] = replacement
+    
+    # Join the list back into a string and return it
+    return ''.join(string_list)
