@@ -10,7 +10,7 @@ from utils import *
 # Number of Total Mutations
 NUM_MUTATIONS = 10
 
-# Defines for Mutations 
+# Defines for Mutations
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
 MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
 EIGHT_BYTE = 9223372036854775808
@@ -29,7 +29,7 @@ delimiters_mutations_arr = [
     "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
     "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
     "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
-    "}", "[", "]", "\"", "\'", 
+    "}", "[", "]", "\"", "\'",
 ]
 
 def is_csv(words):
@@ -47,7 +47,7 @@ a,b,c,S
 e,f,g,ecr
 i,j,k,et
 
--> 
+->
 [['header', 'must', 'stay', 'intact'], ['a', 'b', 'c', 'S'], ['e', 'f', 'g', 'ecr'], ['i', 'j', 'k', 'et']]
 '''
 def csv_to_list(data):
@@ -86,6 +86,7 @@ def send_to_process(p, csv_payload, filepath):
     p.proc.stdin.close()
 
     code = p.poll(True)
+    p.close()
 
     if code is None:
         print("Hang or Infinite Loop Detected. Terminating")
@@ -95,7 +96,7 @@ def send_to_process(p, csv_payload, filepath):
         return True
     else:
         return False
-    
+
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
@@ -105,6 +106,7 @@ def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
     p.proc.stdin.close()
 
     code = p.poll(True)
+    p.close()
 
     if code != 0:
         write_crash_output(filepath, payload)
@@ -173,7 +175,7 @@ def add_rows(data: list, filepath):
     for i in range(1, 11):
         p = get_process(filepath)
         print(f"  > Adding {i} Extra Row(s)")
-        
+
         row = []
         for i in range(0, rowlen):
             row.append(random.choice(string.ascii_letters))
@@ -197,7 +199,7 @@ def add_cols(data: list, filepath):
 
         for row in d:
             row.append(random.choice(string.ascii_letters))
-        
+
         if send_to_process(p, d, filepath):
             return True
 
@@ -242,10 +244,10 @@ def mutate_data_ints(data: list, filepath):
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {num}")
                     p = get_process(filepath)
                     d[i][j] = num
-            
+
                     if send_to_process(p, d, filepath):
-                        return True 
-                
+                        return True
+
                 for x in range(0, 10):
                     if not is_num(data[i][j]):
                         continue
@@ -264,10 +266,10 @@ def mutate_data_ints(data: list, filepath):
                     else:
                         p.proc.stdin.close()
                         break
-                        
+
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {d[i][j]}")
                     if send_to_process(p, d, filepath):
-                        return True 
+                        return True
     return False
 
 '''
@@ -285,9 +287,9 @@ def mutate_data_values_with_delimiters(data: list, filepath):
                     print(f"Replacing: {i}:{j} ({d[i][j]}) with {delim}")
                     p = get_process(filepath)
                     d[i][j] = delim
-            
+
                     if send_to_process(p, d, filepath):
-                        return True 
+                        return True
     return False
 
 def mutate_delimiters(data: list, filepath):
@@ -324,4 +326,3 @@ def flip_bits(data: list, filepath, numflips):
                     if send_to_process(p, d, filepath):
                         return True
     return False
-                
