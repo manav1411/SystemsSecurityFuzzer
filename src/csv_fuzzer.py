@@ -160,6 +160,9 @@ def perform_mutation(filepath, data, i):
     elif i == 8:
         if flip_bits(data, filepath, 50):
             return True
+    elif i == 9:
+        if stack_smash(filepath, 250):
+            return True
     else:
         return False
 
@@ -324,4 +327,29 @@ def flip_bits(data: list, filepath, numflips):
                     if send_to_process(p, d, filepath):
                         return True
     return False
-                
+
+
+
+
+'''
+attempts to stack smash the binary with %p
+'''
+def stack_smash(filepath, p_count):
+
+    # Create the payload with %p p_count times in each row, repeated 20 times.
+    payload1 = ['header,' + 'must,' + 'stay,' + 'intact']
+    payload2 = ['%p'*p_count, '%p'*p_count, '%p'*p_count, '%p'*p_count] * 20
+    payload3 = ['%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2]
+
+    # Combine the three payloads
+    final_payload = [payload1, payload2, payload3]
+
+    # Print the payload for debugging purposes
+    print(f"Payload: {final_payload}")
+
+    # Initialize the process
+    p = get_process(filepath)
+
+    #call send_to_process with the payload.
+
+    return False
