@@ -22,6 +22,9 @@ num_mutations_arr = [
     MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
 ]
 
+queue = []
+found_paths = []
+
 '''
 Returns whether the given data is valid JSON or not
 '''
@@ -39,6 +42,14 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(p, payload, filepath):
     p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
+    output = p.recvline()
+
+    # A different traversal path has been found and hence it is added to the queue
+    if output not in found_paths:
+        queue.append(payload) # Add the current payload into the queue
+        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+        print("# == # == # New Path Found # == # == #")
+
     p.proc.stdin.close()
 
     code = p.poll(True)
@@ -53,12 +64,20 @@ def send_to_process(p, payload, filepath):
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
-    data = json.loads(words)
-    for i in range(0, NUM_MUTATIONS):
-        d = copy.deepcopy(data)
-        if perform_mutation(filepath, d, i):
-            print_crash_found()
-            exit()
+    queue.append(json.loads(words))
+
+    # Do the first default payload to see what the intial output should be.
+    p = get_process(filepath)
+    p.sendline(words)
+    output = p.recvline()
+    found_paths.append(output)
+
+    for item in queue:
+        for i in range(0, NUM_MUTATIONS):
+            d = copy.deepcopy(item)
+            if perform_mutation(filepath, d, i):
+                print_crash_found()
+                exit()
 
     print_no_crash_found()
 
@@ -66,11 +85,7 @@ def fuzz_json(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data: json, i):
-    if i == 0:          # Testing Default Payload
-        print("> Testing Normal Payload")
-        if send_to_process(get_process(filepath), data, filepath):
-            return True
-    elif i == 1:
+    if i == 1:
         print("> Testing Sending Nothing")
         if send_to_process(get_process(filepath), '', filepath):
             return True

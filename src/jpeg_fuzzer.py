@@ -64,6 +64,9 @@ magic_bytes_arr = [
     XFIG, XPM, BZIP, COMPRESS, GZIP, PKZIP, TAR_POSIX, MS_DOS, ELF
 ]
 
+queue = []
+found_paths = []
+
 '''
 Returns whether the given data is valid JPEG or not
 ( Checks the magic bytes at the start of the file )
@@ -77,6 +80,14 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(p, payload, filepath):
     p.sendline(payload)
+    output = p.recvline()
+
+    # A different traversal path has been found and hence it is added to the queue
+    if output not in found_paths:
+        queue.append(payload) # Add the current payload into the queue
+        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+        print("# == # == # New Path Found # == # == #")
+
     p.proc.stdin.close()
 
     code = p.poll(True)
@@ -91,11 +102,20 @@ def send_to_process(p, payload, filepath):
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_jpeg(filepath, words):
-    for i in range(0, NUM_MUTATIONS):
-        d = copy.deepcopy(words)
-        if perform_mutation(filepath, d, i):
-            print_crash_found()
-            exit()
+    queue.append(words)
+
+    # Do the first default payload to see what the intial output should be.
+    p = get_process(filepath)
+    p.sendline(words)
+    output = p.recvline()
+    found_paths.append(output)
+
+    for item in queue:
+        for i in range(0, NUM_MUTATIONS):
+            d = copy.deepcopy(item)
+            if perform_mutation(filepath, d, i):
+                print_crash_found()
+                exit()
 
     print_no_crash_found()
 

@@ -38,6 +38,9 @@ delimiters_mutations_arr = [
     "}", "[", "]", "\"", "\'", "\0"
 ]
 
+queue = []
+found_paths = []
+
 def is_csv(words):
     try:
         csv.reader(words)
@@ -89,26 +92,23 @@ Sends a given input to a process, then returns whether the process crashes or no
 def send_to_process(p, csv_payload, filepath):
     payload = list_to_csv(csv_payload, ',')
     p.sendline(payload)
+    output = p.recvline()
+
+    # A different traversal path has been found and hence it is added to the queue
+    if output not in found_paths:
+        queue.append(payload) # Add the current payload into the queue
+        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+        print("# == # == # New Path Found # == # == #")
+
     p.proc.stdin.close()
 
-    TIMEOUT = 1500; 
-    startTime = datetime.datetime.now();
+    code = p.poll(True)
     
-    code = p.poll(block=True)
-
-    while code is None:
-        elapsed = datetime.datetime.now() - startTime;
-        if (elapsed >= TIMEOUT):
-            write_crash_output(filepath, payload)
-            print("PROGRAM HUNG")
-            break
-        code = p.poll(block=True)
-
-    p.close()
-
     if code != 0:
         write_crash_output(filepath, payload)
         return True
+    else:
+        return False
     '''
     Irteza Chaudhry
     Yes, stack smashing is potentially exploitable
@@ -143,14 +143,21 @@ def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
 Main function call to begin fuzzing CSV input binaries
 '''
 def fuzz_csv(filepath, words):
-    csv_list = csv_to_list(words)
+    queue.append(csv_to_list(words))
 
-    for i in range(0, NUM_MUTATIONS):
-        deepcopy = copy.deepcopy(csv_list)
+    # Do the first default payload to see what the intial output should be.
+    p = get_process(filepath)
+    p.sendline(words)
+    output = p.recvline()
+    found_paths.append(output)
 
-        if perform_mutation(filepath, deepcopy, i):
-            print_crash_found()
-            exit()
+    for item in queue:
+        for i in range(0, NUM_MUTATIONS):
+            deepcopy = copy.deepcopy(item)
+
+            if perform_mutation(filepath, deepcopy, i):
+                print_crash_found()
+                exit()
 
     print_no_crash_found()
 
