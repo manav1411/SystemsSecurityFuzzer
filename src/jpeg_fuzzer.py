@@ -1,6 +1,6 @@
 from pwn import *
 import copy
-from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output
+from utils import *
 
 '''
 Number of Total Mutations
@@ -82,11 +82,19 @@ def send_to_process(p, payload, filepath):
     p.sendline(payload)
     output = p.recvline()
 
-    # A different traversal path has been found and hence it is added to the queue
-    if output not in found_paths:
-        queue.append(payload) # Add the current payload into the queue
-        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-        print("# == # == # New Path Found # == # == #")
+    try: 
+        output = p.recvline()
+        if output == "":
+            pass
+        # A different traversal path has been found and hence it is added to the queue
+        elif output not in found_paths:
+            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+            if not ("invalid" in output or "Invalid" in output):
+                queue.append(payload) # Add the current payload into the queue
+                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+                print_new_path_found()
+    except:
+        print("Exception in Recvline Caused")
 
     p.proc.stdin.close()
 

@@ -28,7 +28,6 @@ if __name__ == "__main__":
         print(f"{RED}ERROR 404: the file '{filepath}' doesn't exist.{RESET}")
         exit()
 
-    words = []
     # Checks input file exists, extracts sample line-separated input into list
     try:
         with open(inputpath, 'r') as f:

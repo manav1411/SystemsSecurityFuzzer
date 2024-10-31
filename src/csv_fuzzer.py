@@ -11,7 +11,7 @@ from math import pi
 from utils import *
 
 # Number of Total Mutations
-NUM_MUTATIONS = 100
+NUM_MUTATIONS = 20
 
 # Defines for Mutations
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -92,31 +92,26 @@ Sends a given input to a process, then returns whether the process crashes or no
 def send_to_process(p, csv_payload, filepath):
     payload = list_to_csv(csv_payload, ',')
     p.sendline(payload)
-    output = p.recvline()
 
-    # A different traversal path has been found and hence it is added to the queue
-    if output not in found_paths:
-        queue.append(payload) # Add the current payload into the queue
-        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-        print("# == # == # New Path Found # == # == #")
+    try: 
+        output = p.recvline()
+        if output == "":
+            pass
+        # A different traversal path has been found and hence it is added to the queue
+        elif output not in found_paths:
+            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+            if not ("invalid" in output or "Invalid" in output):
+                queue.append(csv_payload) # Add the current payload into the queue
+                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+                print_new_path_found()
+    except:
+        print("Exception in Recvline Caused")
 
     p.proc.stdin.close()
 
     code = p.poll(True)
     
     if code != 0:
-        write_crash_output(filepath, payload)
-        return True
-    else:
-        return False
-    '''
-    Irteza Chaudhry
-    Yes, stack smashing is potentially exploitable
-
-    Adam Tanana
-    Yes. From stack smashing. Since that's potentially exploitable
-    '''
-    if code == signal.SIGABRT:
         write_crash_output(filepath, payload)
         return True
     else:
@@ -166,13 +161,9 @@ Begins the mutation process with a range of CSV files
 '''
 def perform_mutation(filepath, data, i):
     if i == 0:
-        print("> Testing Normal Payload")
-        if send_to_process(get_process(filepath), data, filepath):
-            return True
+        pass # clean up later
     elif i == 1:
-        print("> Testing Empty Payload")
-        if send_to_process(get_process(filepath), "", filepath):
-            return True
+        pass # clean up later
     elif i == 2:
         if add_rows(data, filepath):
             return True
@@ -185,19 +176,19 @@ def perform_mutation(filepath, data, i):
     elif i == 5:
         if mutate_data_ints(data, filepath):
             return True
-    elif i == 6:
+    elif i == 60:
         if mutate_data_values_with_delimiters(data, filepath):
             return True
-    elif i == 7:
+    elif i == 70:
         if mutate_delimiters(data, filepath):
             return True
-    elif i == 8:
+    elif i == 80:
         if flip_bits(data, filepath, 50):
             return True
-    elif i == 9:
+    elif i == 100:
         if mutate_index(data, filepath):
             return True
-    elif i == 10:
+    elif i == 100:
         if mutate_strings(data, filepath):
             return True
     elif i == 10:

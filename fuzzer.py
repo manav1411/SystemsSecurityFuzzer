@@ -11,7 +11,7 @@ if __name__ == "__main__":
         binaries = [f for f in listdir("./binaries") if isfile(join("./binaries", f))]
 
         for file in binaries:
-            command += f"python3 src/fuzzer.py {file} {file}.txt & "
+            command += f"python3 src/fuzzer.py {file} {file}.txt ; "
     else:
         command = f"python3 src/fuzzer.py {sys.argv[1]} {sys.argv[2]}"
 

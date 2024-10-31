@@ -2,10 +2,10 @@ from pwn import *
 import json
 import copy
 from math import pi
-from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output, is_num, is_str
+from utils import *
 
 # Number of Total Mutations
-NUM_MUTATIONS = 5
+NUM_MUTATIONS = 10
 
 # Defines for Mutations 
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -44,11 +44,19 @@ def send_to_process(p, payload, filepath):
     p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
     output = p.recvline()
 
-    # A different traversal path has been found and hence it is added to the queue
-    if output not in found_paths:
-        queue.append(payload) # Add the current payload into the queue
-        found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-        print("# == # == # New Path Found # == # == #")
+    try: 
+        output = p.recvline()
+        if output == "":
+            pass
+        # A different traversal path has been found and hence it is added to the queue
+        elif output not in found_paths:
+            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+            if not ("invalid" in output or "Invalid" in output):
+                queue.append(payload) # Add the current payload into the queue
+                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
+                print_new_path_found()
+    except:
+        print("Exception in Recvline Caused")
 
     p.proc.stdin.close()
 
@@ -67,12 +75,19 @@ def fuzz_json(filepath, words):
     queue.append(json.loads(words))
 
     # Do the first default payload to see what the intial output should be.
+    # Added some tests for JSON running slowly, think it it because it waits for a return that takes a while
     p = get_process(filepath)
+    print("Got Process")
     p.sendline(words)
+    print("Send Payload")
     output = p.recvline()
+    print("Got Output")
     found_paths.append(output)
+    print("Added Path")
 
     for item in queue:
+        print(queue)
+        print(found_paths)
         for i in range(0, NUM_MUTATIONS):
             d = copy.deepcopy(item)
             if perform_mutation(filepath, d, i):
@@ -85,17 +100,17 @@ def fuzz_json(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data: json, i):
-    if i == 1:
+    if i == 0:
         print("> Testing Sending Nothing")
         if send_to_process(get_process(filepath), '', filepath):
             return True
-    elif i == 2:        # Testing Adding Fields
+    elif i == 1:        # Testing Adding Fields
         if (add_fields(data, filepath)):
             return True
-    elif i == 3:        # Testing Removing Fields
+    elif i == 2:        # Testing Removing Fields
         if (remove_fields(data, filepath)):
             return True
-    elif i == 4:        # Testing Mutating Num Fields
+    elif i == 3:        # Testing Mutating Num Fields
         if (mutate_nums(data, filepath)):
             return True
     else:   
@@ -127,20 +142,12 @@ Removes each of the top level JSON fields
 def remove_fields(data: json, filepath):
     print("> Testing Removing Fields")
     keys = data.keys()  
-    for i in range(0, len(keys)):
+    for keyValue in keys:
         p = get_process(filepath)
-        print(f"  > Removing Field at Index {i}")
         d = copy.deepcopy(data)
+        print(f"    > Deleting Field {keyValue}")
+        del d[keyValue]
 
-        # Ghetto ass solution right now
-        # TODO: Pretty sure this only removes top level keys
-        j = 0
-        for keyValue in keys:
-            if j == i: 
-                print(f"    > Deleting Field {keyValue}")
-                del d[keyValue]
-            j += 1
-        
         if send_to_process(p, d, filepath):
             return True
         
@@ -166,7 +173,7 @@ def mutate_nums(data: json, filepath):
             if (send_to_process(p, d, filepath)):
                 return True
 
-        for i in range(0, 10):
+        for i in range(0, 4):
             d = copy.deepcopy(data)
             p = get_process(filepath)
             curr = d[keyValue]

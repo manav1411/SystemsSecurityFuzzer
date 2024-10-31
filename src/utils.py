@@ -23,6 +23,11 @@ def print_no_crash_found():
     print("####### No Crashable  Input Found #######")
     print("#########################################")
 
+def print_new_path_found():
+    print("# == # == # == # ==== # == # == # == #")
+    print("# == # == # New Path Found # == # == #")
+    print("# == # == # Added to Queue # == # == #")
+    print("# == # == # == # ==== # == # == # == #")
 
 '''
 Checks whether a given data is an int
