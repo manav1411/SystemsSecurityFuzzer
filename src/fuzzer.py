@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     if json_fuzzer.is_json(words):
         print("Found JSON Input > Fuzzing")
-        json_fuzzer.fuzz_json(filepath, words)
+        json_fuzzer.fuzz_json(filepath, words, True)
         exit()
     
     if jpeg_fuzzer.is_jpeg(words):

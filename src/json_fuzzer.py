@@ -1,6 +1,7 @@
 from pwn import *
 import json
 import copy
+import multiprocessing
 from math import pi
 from utils import print_crash_found, print_no_crash_found, get_process, write_crash_output, is_num, is_str
 
@@ -22,8 +23,8 @@ num_mutations_arr = [
     MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
 ]
 
-queue = []
 found_paths = []
+processes = []
 
 '''
 Returns whether the given data is valid JSON or not
@@ -46,9 +47,9 @@ def send_to_process(p, payload, filepath):
 
     # A different traversal path has been found and hence it is added to the queue
     if output not in found_paths:
-        queue.append(payload) # Add the current payload into the queue
         found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
         print("# == # == # New Path Found # == # == #")
+        begin_fuzzing_process(filepath, json.dumps(payload))
 
     p.proc.stdin.close()
 
@@ -56,6 +57,7 @@ def send_to_process(p, payload, filepath):
     
     if code != 0:
         write_crash_output(filepath, json.dumps(payload))
+        kill_processes()
         return True
     else:
         return False
@@ -63,23 +65,39 @@ def send_to_process(p, payload, filepath):
 '''
 Main function call to begin fuzzing JSON input binaries
 '''
-def fuzz_json(filepath, words):
-    queue.append(json.loads(words))
+def fuzz_json(filepath, words, do_default):
+    if do_default:
+        # Do the first default payload to see what the intial output should be.
+        p = get_process(filepath)
+        p.sendline(words)
+        output = p.recvline()
+        found_paths.append(output)
 
-    # Do the first default payload to see what the intial output should be.
-    p = get_process(filepath)
-    p.sendline(words)
-    output = p.recvline()
-    found_paths.append(output)
-
-    for item in queue:
-        for i in range(0, NUM_MUTATIONS):
-            d = copy.deepcopy(item)
-            if perform_mutation(filepath, d, i):
-                print_crash_found()
-                exit()
+    jsonWords = json.loads(words)
+    for i in range(0, NUM_MUTATIONS):
+        d = copy.deepcopy(jsonWords)
+        if perform_mutation(filepath, d, i):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
+
+'''
+Use this when calling a new thread to start the mutation process from the beggining
+Current implementation is that we start a new thread anytime a new traversal path is found
+'''
+def begin_fuzzing_process(filepath, words):
+    t = multiprocessing.Process(target=fuzz_json, args=[filepath, words, False])
+    print("Starting New Thread")
+    t.start()
+    processes.append(t)
+
+'''
+Call this once a crash input has been found to kill all threads
+'''
+def kill_processes():
+    for t in processes:
+        t.terminate()
 
 '''
 Begins the mutation process
@@ -110,7 +128,6 @@ def add_fields(data: json, filepath):
     print("> Testing Adding Fields")
     for i in range(1, 11):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Field(s)")
         d = copy.deepcopy(data)
 
         for j in range (0, i):
@@ -129,7 +146,6 @@ def remove_fields(data: json, filepath):
     keys = data.keys()  
     for i in range(0, len(keys)):
         p = get_process(filepath)
-        print(f"  > Removing Field at Index {i}")
         d = copy.deepcopy(data)
 
         # Ghetto ass solution right now
@@ -137,7 +153,6 @@ def remove_fields(data: json, filepath):
         j = 0
         for keyValue in keys:
             if j == i: 
-                print(f"    > Deleting Field {keyValue}")
                 del d[keyValue]
             j += 1
         
@@ -162,7 +177,6 @@ def mutate_nums(data: json, filepath):
             p = get_process(filepath)
             d[keyValue] = num
 
-            print(f"  > Mutating {keyValue} with {d[keyValue]}")
             if (send_to_process(p, d, filepath)):
                 return True
 
@@ -183,7 +197,6 @@ def mutate_nums(data: json, filepath):
                 p.proc.stdin.close()
                 break
 
-            print(f"  > Mutating {keyValue} with {d[keyValue]}")
             if (send_to_process(p, d, filepath)):
                 return True
 

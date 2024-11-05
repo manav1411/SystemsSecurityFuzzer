@@ -109,18 +109,6 @@ def send_to_process(p, csv_payload, filepath):
         return True
     else:
         return False
-    '''
-    Irteza Chaudhry
-    Yes, stack smashing is potentially exploitable
-
-    Adam Tanana
-    Yes. From stack smashing. Since that's potentially exploitable
-    '''
-    if code == signal.SIGABRT:
-        write_crash_output(filepath, payload)
-        return True
-    else:
-        return False
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
