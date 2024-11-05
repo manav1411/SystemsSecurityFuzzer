@@ -5,7 +5,7 @@ from utils import *
 '''
 Number of Total Mutations
 '''
-NUM_MUTATIONS = 5
+NUM_MUTATIONS = 100
 
 '''
 File Structure Bytes of JPEG File - Don't know how important these are in fuzzing
@@ -101,7 +101,7 @@ def send_to_process(p, payload, filepath):
     code = p.poll(True)
     
     if code != 0:
-        write_crash_output(filepath, payload)
+        write_crash_output(filepath, str(payload))
         return True
     else:
         return False
@@ -136,7 +136,7 @@ def perform_mutation(filepath, data, i):
         if send_to_process(get_process(filepath), data, filepath):
             return True
     elif i == 1:
-        print("> Testing Sending Nothing")
+        print("> Testing Sending Nothing") # This crashes but removing this for now
         if send_to_process(get_process(filepath), '', filepath):
             return True
     elif i == 2:
@@ -158,9 +158,6 @@ def perform_mutation(filepath, data, i):
         if insert_random_bytes(filepath, data):
             return True
     elif i == 8:
-        if insert_0xff_bytes(filepath, data):
-            return True
-    elif i == 9:
         if reverse_bytes(filepath, data):
             return True
     else:
@@ -170,46 +167,139 @@ def perform_mutation(filepath, data, i):
 Replaces special bytes with other special bytes
 '''
 def swap_jpeg_bytes(filepath, data):
+    print("Swapping JPEG Bytes to Other Forms")
+    for original in file_struct_arr:
+        for replacement in file_struct_arr:
+            if (original is not replacement):
+                print(f"Replacing {original} with {replacement}")
+                newdata = data.replace(original, replacement)
+
+                if send_to_process(get_process(filepath), newdata, filepath):
+                    return True
     return False
 
 '''
 Removes special bytes from the text
 '''
 def remove_jpeg_bytes(filepath, data):
+    print("Removing JPEG Bytes")
+    for original in file_struct_arr:
+        print(f"Renmoving {original}")
+        newdata = data.replace(original, b"")
+
+        if send_to_process(get_process(filepath), newdata, filepath):
+            return True
     return False
 
 '''
 Replaces the JPEG magic bytes with other formats
 '''
 def change_magic_bytes(filepath, data):
+    print("Changing Magic Bytes")
+    for magic in magic_bytes_arr:
+        newdata = magic + data[12:]
+        print(f"Testing {newdata}")
+
+        if send_to_process(get_process(filepath), newdata, filepath):
+            return True
     return False
 
 '''
 Changes the position of both start and end structure bytes
 '''
 def change_start_end_bytes(filepath, data):
+    print("Swapping Start and End Bytes")
+    newdata = data.replace(END_IMAGE, START_IMAGE)
+    newdata = newdata.replace(START_IMAGE, END_IMAGE, 1) # only replaces the first instance
+
+    if send_to_process(get_process(filepath), newdata, filepath):
+            return True
     return False
+
 
 '''
 Remove random bytes
 '''
 def remove_random_bytes(filepath, data):
+    print("Removing Random Bytes")
+    for i in range(0, 100):
+        newdata = remove_random_bytes_util(data, i)
+
+        if send_to_process(get_process(filepath), newdata, filepath):
+            return True
     return False
 
 '''
 Insert random bytes
 '''
 def insert_random_bytes(filepath, data):
+    print("Inserting Random Bytes")
+    for i in range(0, 100):
+        newdata = insert_random_bytes_util(data, i)
+
+        if send_to_process(get_process(filepath), newdata, filepath):
+            return True
     return False
 
 '''
-Insert 0xFF bytes
-'''
-def insert_0xff_bytes(filepath, data):
-    return False
-
-'''
-Removes special bytes from the text
+Reverses the entire payload cause why not
 '''
 def reverse_bytes(filepath, data):
+    print("Reversing the Entire Thing")
+    if send_to_process(get_process(filepath), data[::-1], filepath):
+            return True
     return False
+
+'''
+Helper
+'''
+def remove_random_bytes_util(data, num_to_remove):
+    if isinstance(data, bytes):
+        # Convert to a mutable bytearray if input is immutable bytes
+        data = bytearray(data)
+    elif not isinstance(data, bytearray):
+        raise TypeError("Input must be bytes or bytearray.")
+    
+    length = len(data)
+    if length == 0:
+        return data  # Nothing to remove if the array is empty.
+    
+    # Determine number of bytes to remove
+    if num_to_remove is None:
+        num_to_remove = random.randint(1, length // 2)
+    else:
+        num_to_remove = min(num_to_remove, length)
+    
+    # Randomly select indices to remove
+    indices_to_remove = sorted(random.sample(range(length), num_to_remove), reverse=True)
+    
+    # Remove bytes at the selected indices
+    for index in indices_to_remove:
+        del data[index]
+    
+    return bytes(data) if isinstance(data, bytes) else data
+
+'''
+Helper
+'''
+def insert_random_bytes_util(data, num_to_insert):
+    if isinstance(data, bytes):
+        # Convert to a mutable bytearray if input is immutable bytes
+        data = bytearray(data)
+    elif not isinstance(data, bytearray):
+        raise TypeError("Input must be bytes or bytearray.")
+        
+    length = len(data)
+    
+    for _ in range(num_to_insert):
+        # Generate a random byte and a random insertion position
+        random_byte = random.randint(0, 255)
+        position = random.randint(0, length)
+        
+        # Insert the random byte at the chosen position
+        data.insert(position, random_byte)
+        
+        # Update the length for the next insertion position
+        length += 1
+    
+    return bytes(data) if isinstance(data, bytes) else data

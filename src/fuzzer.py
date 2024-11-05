@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Checks input file exists, extracts sample line-separated input into list
     try:
-        with open(inputpath, 'r') as f:
+        with open(inputpath, 'rb') as f:
             words = f.read()
     except FileNotFoundError:
         print(f"{RED}ERROR 404: the file '{inputpath}' doesn't exist.{RESET}")
