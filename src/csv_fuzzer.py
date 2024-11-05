@@ -7,6 +7,7 @@ import string
 import signal
 import datetime
 import store
+import multiprocessing
 from math import pi
 from utils import *
 
@@ -38,7 +39,7 @@ delimiters_mutations_arr = [
     "}", "[", "]", "\"", "\'", "\0"
 ]
 
-queue = []
+processes = []
 found_paths = []
 
 def is_csv(words):
@@ -92,13 +93,18 @@ Sends a given input to a process, then returns whether the process crashes or no
 def send_to_process(p, csv_payload, filepath):
     payload = list_to_csv(csv_payload, ',')
     p.sendline(payload)
-    output = p.recvline()
+
+    try:
+        output = p.recvline()
+    except:
+        print("Something went wrong here")
+        return False
 
     # A different traversal path has been found and hence it is added to the queue
     if output not in found_paths:
-        queue.append(payload) # Add the current payload into the queue
         found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
         print("# == # == # New Path Found # == # == #")
+        begin_fuzzing_process(filepath, payload)
 
     p.proc.stdin.close()
 
@@ -109,6 +115,26 @@ def send_to_process(p, csv_payload, filepath):
         return True
     else:
         return False
+
+
+'''
+Use this when calling a new thread to start the mutation process from the beggining
+Current implementation is that we start a new thread anytime a new traversal path is found
+'''
+def begin_fuzzing_process(filepath, words):
+    t = multiprocessing.Process(target=fuzz_csv, args=[filepath, words, False])
+    print("Starting New Thread")
+    print(f"New Payload: {words}")
+
+    t.start()
+    processes.append(t)
+
+'''
+Call this once a crash input has been found to kill all threads
+'''
+def kill_processes():
+    for t in processes:
+        t.terminate()
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
@@ -130,22 +156,21 @@ def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
 '''
 Main function call to begin fuzzing CSV input binaries
 '''
-def fuzz_csv(filepath, words):
-    queue.append(csv_to_list(words))
+def fuzz_csv(filepath, words, do_default):
+    if do_default:
+        # Do the first default payload to see what the intial output should be.
+        p = get_process(filepath)
+        p.sendline(words)
+        output = p.recvline()
+        found_paths.append(output)
 
-    # Do the first default payload to see what the intial output should be.
-    p = get_process(filepath)
-    p.sendline(words)
-    output = p.recvline()
-    found_paths.append(output)
+    for i in range(0, NUM_MUTATIONS):
+        deepcopy = copy.deepcopy(csv_to_list(words))
 
-    for item in queue:
-        for i in range(0, NUM_MUTATIONS):
-            deepcopy = copy.deepcopy(item)
-
-            if perform_mutation(filepath, deepcopy, i):
-                print_crash_found()
-                exit()
+        if perform_mutation(filepath, deepcopy, i):
+            print_crash_found()
+            kill_processes()
+            exit()
 
     print_no_crash_found()
 
@@ -203,7 +228,6 @@ def add_rows(data: list, filepath):
     rowlen = len(d[0])
     for i in range(1, 101):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Row(s)")
 
         row = []
         for i in range(0, rowlen):
@@ -224,7 +248,6 @@ def add_cols(data: list, filepath):
     d = copy.deepcopy(data)
     for i in range(1, 101):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Col(s)")
 
         for row in d:
             row.append(random.choice(string.ascii_letters))
@@ -241,7 +264,6 @@ def add_cols_and_rows(data: list, filepath):
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
-        print(f"  > Adding {i} Extra Cols with {i} Extra Rows")
         p = get_process(filepath)
         for row in d:
             row.append(random.choice(string.ascii_letters))
@@ -270,7 +292,6 @@ def mutate_data_ints(data: list, filepath):
             for j in range (0, width):
                 for num in num_mutations_arr:
                     d = copy.deepcopy(data)
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {num}")
                     p = get_process(filepath)
                     d[i][j] = num
 
@@ -296,7 +317,6 @@ def mutate_data_ints(data: list, filepath):
                         p.proc.stdin.close()
                         break
 
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {d[i][j]}")
                     if send_to_process(p, d, filepath):
                         return True
     return False
@@ -313,7 +333,6 @@ def mutate_data_values_with_delimiters(data: list, filepath):
             for j in range (0, width):
                 for delim in delimiters_mutations_arr:
                     d = copy.deepcopy(data)
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {delim}")
                     p = get_process(filepath)
                     d[i][j] = delim
 

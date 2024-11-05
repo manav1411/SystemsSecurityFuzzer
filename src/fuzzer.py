@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     if csv_fuzzer.is_csv(words):
         print("Found CSV Input  > Fuzzing")
-        csv_fuzzer.fuzz_csv(filepath, words)
+        csv_fuzzer.fuzz_csv(filepath, words, True)
         exit()
 
     # Other filetype checks

@@ -43,7 +43,12 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(p, payload, filepath):
     p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
-    output = p.recvline()
+
+    try:
+        output = p.recvline()
+    except:
+        print("Something went wrong here")
+        return False
 
     # A different traversal path has been found and hence it is added to the queue
     if output not in found_paths:
@@ -89,6 +94,7 @@ Current implementation is that we start a new thread anytime a new traversal pat
 def begin_fuzzing_process(filepath, words):
     t = multiprocessing.Process(target=fuzz_json, args=[filepath, words, False])
     print("Starting New Thread")
+    print(f"New Payload: {words}")
     t.start()
     processes.append(t)
 
