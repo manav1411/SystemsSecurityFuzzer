@@ -76,7 +76,6 @@ def is_jpeg(words):
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
-> JSON specific <
 '''
 def send_to_process(p, payload, filepath):
     p.sendline(payload)
@@ -131,12 +130,12 @@ def fuzz_jpeg(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data, i):
-    if i == 0:          # Testing Default Payload
+    if i == 0:
         print("> Testing Normal Payload")
         if send_to_process(get_process(filepath), data, filepath):
             return True
     elif i == 1:
-        print("> Testing Sending Nothing") # This crashes but removing this for now
+        print("> Testing Sending Nothing")
         if send_to_process(get_process(filepath), '', filepath):
             return True
     elif i == 2:
