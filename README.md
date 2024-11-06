@@ -5,16 +5,11 @@ Fuzzer is in `fuzzer.py`
 
 
 
-## basic test case
+## Usage
+Insert executable (`binary`) into /binaries
 
-`test.c`: basic C program that outputs user input
+Insert valid input (`binary.txt`) into /example_inputs
 
-```gcc test.c -o test```: [optional] to compile.
+To run only that binary: `python3 fuzzer.py binary binary.txt`
 
-`test`: executable for above C file.
-
-`test.txt`: valid input for above C file.
-
-
-
-`python3 src/fuzzer.py [binaryname] [sampleinput.txt]`: runs fuzzer
+To run all binaries in the folder: `python3 fuzzer.py`
