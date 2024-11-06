@@ -43,9 +43,9 @@ if __name__ == "__main__":
     elif jpeg_fuzzer.is_jpeg(words):
         print("Found JPEG Input > Fuzzing")
         jpeg_fuzzer.fuzz_jpeg(filepath, words)
-    elif csv_fuzzer.is_csv(words):
-        print("Found CSV Input  > Fuzzing")
-        csv_fuzzer.fuzz_csv(filepath, words)
+    # elif csv_fuzzer.is_csv(words):
+        #print("Found CSV Input  > Fuzzing")
+        #csv_fuzzer.fuzz_csv(filepath, words)
     else:
         print("No Input Type Detected, Assuming Plaintext Input > Fuzzing")
         plaintext_fuzzer.fuzz_plaintext(filepath, words)

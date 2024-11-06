@@ -8,6 +8,11 @@ Number of Total Mutations
 NUM_MUTATIONS = 100
 
 '''
+Switch to True if you want to see the inputs being send to the binary
+'''
+SEE_INPUTS = False
+
+'''
 File Structure Bytes of JPEG File - Don't know how important these are in fuzzing
 ( https://docs.fileformat.com/image/jpeg/ )
 '''
@@ -78,8 +83,10 @@ def is_jpeg(words):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(p, payload, filepath):
+    if SEE_INPUTS:
+        print(payload)
+        
     p.sendline(payload)
-    output = p.recvline()
 
     try: 
         output = p.recvline()

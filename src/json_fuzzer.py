@@ -4,8 +4,15 @@ import copy
 from math import pi
 from utils import *
 
-# Number of Total Mutations
-NUM_MUTATIONS = 10
+'''
+Number of Total Mutations
+'''
+NUM_MUTATIONS = 100
+
+'''
+Switch to True if you want to see the inputs being send to the binary
+'''
+SEE_INPUTS = False
 
 # Defines for Mutations 
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -41,8 +48,11 @@ Sends a given input to a process, then returns whether the process crashes or no
 > JSON specific <
 '''
 def send_to_process(p, payload, filepath):
-    p.sendline(json.dumps(payload).encode('utf-8')) # back to a string?
-    output = p.recvline()
+    payload = json.dumps(payload).encode('utf-8')
+    if SEE_INPUTS:
+        print(payload)
+    
+    p.sendline(payload)
 
     try: 
         output = p.recvline()
@@ -77,13 +87,9 @@ def fuzz_json(filepath, words):
     # Do the first default payload to see what the intial output should be.
     # Added some tests for JSON running slowly, think it it because it waits for a return that takes a while
     p = get_process(filepath)
-    print("Got Process")
     p.sendline(words)
-    print("Send Payload")
     output = p.recvline()
-    print("Got Output")
     found_paths.append(output)
-    print("Added Path")
 
     for item in queue:
         print(queue)
