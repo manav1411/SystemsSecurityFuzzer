@@ -10,8 +10,16 @@ import store
 from math import pi
 from utils import *
 
-# Number of Total Mutations
-NUM_MUTATIONS = 20
+'''
+Number of Total Mutations
+'''
+NUM_MUTATIONS = 100
+
+'''
+Switch to True if you want to see the inputs being send to the binary
+'''
+SEE_INPUTS = False
+
 
 # Defines for Mutations
 MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
@@ -91,6 +99,8 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(p, csv_payload, filepath):
     payload = list_to_csv(csv_payload, ',')
+    if SEE_INPUTS:
+        print(payload)
     p.sendline(payload)
 
     try: 

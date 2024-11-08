@@ -1,7 +1,7 @@
 from pwn import *
 import random
 
-context.log_level='warn'
+context.log_level='critical'
 
 def write_crash_output(filename, input):
     output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
