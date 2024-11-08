@@ -6,7 +6,6 @@ import random
 import string
 import signal
 import datetime
-import store
 from math import pi
 from utils import *
 
@@ -16,9 +15,10 @@ Number of Total Mutations
 NUM_MUTATIONS = 100
 
 '''
-Switch to True if you want to see the inputs being send to the binary
+Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
+PRINT_OUTPUTS = True
 
 
 # Defines for Mutations
@@ -105,8 +105,8 @@ def send_to_process(p, csv_payload, filepath):
 
     try: 
         output = p.recvline()
-        if output == "":
-            pass
+        if PRINT_OUTPUTS:
+            print(f"Output: {output}")
         # A different traversal path has been found and hence it is added to the queue
         elif output not in found_paths:
             # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
@@ -115,7 +115,7 @@ def send_to_process(p, csv_payload, filepath):
                 found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
                 print_new_path_found()
     except:
-        print("Exception in Recvline Caused")
+        pass
 
     p.proc.stdin.close()
 
@@ -186,22 +186,22 @@ def perform_mutation(filepath, data, i):
     elif i == 5:
         if mutate_data_ints(data, filepath):
             return True
-    elif i == 60:
+    elif i == 6:
         if mutate_data_values_with_delimiters(data, filepath):
             return True
-    elif i == 70:
+    elif i == 7:
         if mutate_delimiters(data, filepath):
             return True
-    elif i == 80:
+    elif i == 8:
         if flip_bits(data, filepath, 50):
             return True
-    elif i == 100:
+    elif i == 10:
         if mutate_index(data, filepath):
             return True
-    elif i == 100:
+    elif i == 11:
         if mutate_strings(data, filepath):
             return True
-    elif i == 10:
+    elif i == 12:
         if stack_smash(filepath, 250):
             return True
     else:
@@ -216,7 +216,6 @@ def add_rows(data: list, filepath):
     rowlen = len(d[0])
     for i in range(1, 101):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Row(s)")
 
         row = []
         for i in range(0, rowlen):
@@ -237,7 +236,6 @@ def add_cols(data: list, filepath):
     d = copy.deepcopy(data)
     for i in range(1, 101):
         p = get_process(filepath)
-        print(f"  > Adding {i} Extra Col(s)")
 
         for row in d:
             row.append(random.choice(string.ascii_letters))
@@ -254,7 +252,6 @@ def add_cols_and_rows(data: list, filepath):
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
-        print(f"  > Adding {i} Extra Cols with {i} Extra Rows")
         p = get_process(filepath)
         for row in d:
             row.append(random.choice(string.ascii_letters))
@@ -283,7 +280,6 @@ def mutate_data_ints(data: list, filepath):
             for j in range (0, width):
                 for num in num_mutations_arr:
                     d = copy.deepcopy(data)
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {num}")
                     p = get_process(filepath)
                     d[i][j] = num
 
@@ -309,7 +305,6 @@ def mutate_data_ints(data: list, filepath):
                         p.proc.stdin.close()
                         break
 
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {d[i][j]}")
                     if send_to_process(p, d, filepath):
                         return True
     return False
@@ -326,7 +321,6 @@ def mutate_data_values_with_delimiters(data: list, filepath):
             for j in range (0, width):
                 for delim in delimiters_mutations_arr:
                     d = copy.deepcopy(data)
-                    print(f"Replacing: {i}:{j} ({d[i][j]}) with {delim}")
                     p = get_process(filepath)
                     d[i][j] = delim
 
@@ -335,9 +329,9 @@ def mutate_data_values_with_delimiters(data: list, filepath):
     return False
 
 def mutate_delimiters(data: list, filepath):
+    print("Mutating delimiters")
     for delim in delimiters_mutations_arr:
         d = copy.deepcopy(data)
-        print(f"Replacing delimiters with {delim}")
         p = get_process(filepath)
 
         if send_to_process_newdelim(p, d, filepath, delim):
@@ -361,7 +355,6 @@ def flip_bits(data: list, filepath, numflips):
                     flipped = uflip_bits(bits)
                     back_to_string = ubits_to_string(flipped)
 
-                    print(f"Bit Flipping (Iter: {num}): {d[i][j]} to {back_to_string}")
                     d[i][j] = back_to_string
 
                     p = get_process(filepath)
@@ -382,51 +375,26 @@ def mutate_strings(data: list, filepath):
                 for delim in delimiters_mutations_arr:
                     p = get_process(filepath)
                     rand = replace_random_with_value(curr, delim)
-                    print(f"Replacing {i}:{j} with {rand}")
                     d[i][j] = rand
                     if send_to_process(p, d, filepath):
                         return True
     return False
 
 def mutate_index(data: list, filepath):
-    print("Sending Payload")
-    payload = store.getPay()
-    p = get_process(filepath)
-    
-    p.sendline(payload)
-    p.proc.stdin.close()
+    print("Mutating indexes with string of len 0 - 100")
+    width = len(data[0])
+    height = len(data)
 
-    TIMEOUT = 1500; 
-    startTime = datetime.datetime.now()
-    
-    code = p.poll(block=True)
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                for x in range (0, 1000):
+                    p = get_process(filepath)
+                    d[i][j] = 'A' * x
+                    if send_to_process(p, d, filepath):
+                        return True
+    return False
 
-    while code is None:
-        elapsed = datetime.datetime.now() - startTime
-        if (elapsed >= TIMEOUT):
-            write_crash_output(filepath, payload)
-            print("PROGRAM HUNG")
-            break
-        code = p.poll(block=True)
-
-    p.close()
-
-    if code != 0:
-        write_crash_output(filepath, payload)
-        return True
-    '''
-    Irteza Chaudhry
-    Yes, stack smashing is potentially exploitable
-
-    Adam Tanana
-    Yes. From stack smashing. Since that's potentially exploitable
-    '''
-    if code == signal.SIGABRT:
-        write_crash_output(filepath, payload)
-        return True
-    else:
-        return False
-    
 
 def replace_random_with_value(string, replacement):
     if not string:  # If the string is empty, return it as-is
@@ -457,13 +425,5 @@ def stack_smash(filepath, p_count):
 
     # Combine the three payloads
     final_payload = [payload1, payload2, payload3]
-
-    # Print the payload for debugging purposes
-    print(f"Payload: {final_payload}")
-
-    # Initialize the process
-    p = get_process(filepath)
-
-    #call send_to_process with the payload.
 
     return False
