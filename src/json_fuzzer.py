@@ -5,29 +5,12 @@ from math import pi
 from utils import *
 
 '''
-Number of Total Mutations
-'''
-NUM_MUTATIONS = 100
-
-'''
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
 
-# Defines for Mutations 
-MASS_POS_NUM = 999999999999999999999999999999999999999999999999999999
-MASS_NEG_NUM = -999999999999999999999999999999999999999999999999999999
-EIGHT_BYTE = 9223372036854775808
-MAX_INT_32 = 2147483647
-MIN_INT_32 = -2147483648
-MAX_INT_64 = 9223372036854775807
-MIN_INT_64 = -9223372036854775808
-
-num_mutations_arr = [
-    MASS_NEG_NUM, MASS_POS_NUM, EIGHT_BYTE, MAX_INT_32,
-    MAX_INT_64, MIN_INT_32, MIN_INT_64, MAX_INT_32 + 1,
-    MAX_INT_64 + 1, MIN_INT_32 - 1, MIN_INT_64 - 1, pi
-]
+arr_of_types = ["A" * 400, -1389054671389658013709571389065891365890189164, json.loads('{"Name": "Jennifer Smith"}'), ["A", 1234, "Meow", -9999], None, True, False]
+type_swaps_arr = ["A" * 2000, -9999999999999999999999999999999999999999999999999999999999999999999, json.loads('{"Name": "Jennifer Smith","Contact Number": 7867567898,"Email": "jen123@gmail.com","Hobbies":["Reading", "Sketching", "Horse Riding"]}'), arr_of_types, None, True, False]
 
 queue = []
 found_paths = []
@@ -94,36 +77,25 @@ def fuzz_json(filepath, words):
     for item in queue:
         print(queue)
         print(found_paths)
-        for i in range(0, NUM_MUTATIONS):
-            d = copy.deepcopy(item)
-            if perform_mutation(filepath, d, i):
-                print_crash_found()
-                exit()
+        d = copy.deepcopy(item)
+        if perform_mutation(filepath, d):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
 
 '''
 Begins the mutation process
 '''
-def perform_mutation(filepath, data: json, i):
-    if i == 0:
-        print("> Testing Sending Nothing")
-        if send_to_process(get_process(filepath), '', filepath):
-            return True
-    elif i == 1:        # Testing Adding Fields
-        if (add_fields(data, filepath)):
-            return True
-    elif i == 2:        # Testing Removing Fields
-        if (remove_fields(data, filepath)):
-            return True
-    elif i == 3:        # Testing Mutating Num Fields
-        if (mutate_nums(data, filepath)):
-            return True
-    else:   
-        print("Haven't done this yet!")
-        # TODO: Continue Implementing
-        return False
-
+def perform_mutation(filepath, data: json):
+    if send_to_process(get_process(filepath), '', filepath): return True
+    if add_fields(data, filepath): return True
+    if remove_fields(data, filepath): return True
+    if mutate_nums(data, filepath): return True
+    if mutate_strings(data, filepath): return True
+    if flip_bits(data, filepath): return True
+    if swap_types(data, filepath): return True
+    return False
 '''
 Adds 1 - 10 New Fields
 '''
@@ -170,40 +142,77 @@ def mutate_nums(data: json, filepath):
         if not is_num(data[keyValue]):
             continue
 
-        for num in num_mutations_arr:
-            d = copy.deepcopy(data)
-            p = get_process(filepath)
-            d[keyValue] = num
-
-            print(f"  > Mutating {keyValue} with {d[keyValue]}")
-            if (send_to_process(p, d, filepath)):
-                return True
-
-        for i in range(0, 4):
-            d = copy.deepcopy(data)
-            p = get_process(filepath)
-            curr = d[keyValue]
-
-            if i == 0:
-                d[keyValue] = int(curr)
-            elif i == 1:
-                d[keyValue] = curr * 1.0
-            elif i == 2:
-                d[keyValue] = curr * -1
-            elif i == 3:
-                d[keyValue] = str(curr)
-            else:
-                p.proc.stdin.close()
-                break
-
-            print(f"  > Mutating {keyValue} with {d[keyValue]}")
-            if (send_to_process(p, d, filepath)):
-                return True
-
+        with open('./src/wordlists/allnumber.txt', 'r') as file:
+            for line in file:
+                d = copy.deepcopy(data)
+                p = get_process(filepath)
+                d[keyValue] = line
+                
+                if (send_to_process(p, d, filepath)):
+                    file.close()
+                    return True
+            file.close()
     return False
 
-# Mutate int inputs with defines
-# Mutate string inputs with defines
-# Flip Bits
-# Swap Types
-# Mutate Strings
+'''
+Mutates string fields within the JSON to different values
+'''
+def mutate_strings(data: json, filepath):
+    print("> Mutating String Fields")
+    keys = data.keys()
+
+    for keyValue in keys:
+        if not is_str(data[keyValue]):
+            continue
+
+        with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+            for line in file:
+                d = copy.deepcopy(data)
+                p = get_process(filepath)
+                d[keyValue] = line
+                
+                if (send_to_process(p, d, filepath)):
+                    file.close()
+                    return True
+            file.close()
+    return False
+
+'''
+Mutates fields with the bits randomly flipped
+'''
+def flip_bits(data: json, filepath):
+    print("> Flipping Bits")
+    keys = data.keys()
+
+    for keyValue in keys:
+        for i in range(0, len(data[keyValue] * 20)):
+            d = copy.deepcopy(data)
+            p = get_process(filepath)
+
+            if is_num(d[keyValue]):
+                d[keyValue] = ubits_to_number(uflip_bits(unumber_to_bits(d[keyValue])))
+            elif is_str(d[keyValue]):
+                d[keyValue] = ubits_to_string(uflip_bits(ustring_to_bits(d[keyValue])))
+
+            if (send_to_process(p, d, filepath)):
+                return True
+            
+    return False
+
+'''
+Swap the types of JSON Fields to other types
+'''
+def swap_types(data: json, filepath):
+    print("Swapping types of JSON Fields")
+    keys = data.keys()
+
+    for keyValue in keys:
+        for type in type_swaps_arr:
+            d = copy.deepcopy(data)
+            p = get_process(filepath)
+
+            d[keyValue] = type
+
+            if (send_to_process(p, d, filepath)):
+                return True
+    return False

@@ -81,3 +81,9 @@ def unumber_to_bits(number, bit_length=None):
         binary_representation = binary_representation.zfill(bit_length)
     
     return binary_representation
+
+'''
+Converts bits back to a number
+'''
+def ubits_to_number(bits):
+     return int(bits, 2)
