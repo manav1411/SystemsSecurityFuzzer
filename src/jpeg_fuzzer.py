@@ -1,5 +1,6 @@
-from pwn import *
 import copy
+import subprocess
+import time
 from utils import *
 
 '''
@@ -11,6 +12,7 @@ NUM_MUTATIONS = 100
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
+PRINT_OUTPUTS = False
 
 '''
 File Structure Bytes of JPEG File - Don't know how important these are in fuzzing
@@ -82,30 +84,43 @@ def is_jpeg(words):
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
-def send_to_process(p, payload, filepath):
+def send_to_process(payload, filepath):
     if SEE_INPUTS:
         print(payload)
         
-    p.sendline(payload)
+    try:
+        process = subprocess.run(
+            [filepath],
+            input=payload,
+            text=True,
+            capture_output=True
+        )
+        
+        # Capture the return code and output
+        code = process.returncode
+        output = process.stdout
 
-    try: 
-        output = p.recvline()
-        if output == "":
-            pass
-        # A different traversal path has been found and hence it is added to the queue
-        elif output not in found_paths:
-            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-            if not ("invalid" in output or "Invalid" in output):
-                queue.append(payload) # Add the current payload into the queue
-                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-                print_new_path_found()
-    except:
-        print("Exception in Recvline Caused")
-
-    p.proc.stdin.close()
-
-    code = p.poll(True)
+        if PRINT_OUTPUTS:
+            print(output)
+        
+    except Exception as e:
+        print(e)
+        return False
     
+    if output == "":
+        pass
+    # A different traversal path has been found and hence it is added to the queue
+    elif output not in found_paths:
+        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+        if not ("invalid" in output or "Invalid" in output):
+            # Add the current payload into the queue
+            queue.append(payload)
+
+            # Adds the output so we don't encounter it again and keep appending 
+            found_paths.append(output)
+            print_new_path_found()
+            time.sleep(1)
+
     if code != 0:
         write_crash_output(filepath, str(payload))
         return True
@@ -119,10 +134,7 @@ def fuzz_jpeg(filepath, words):
     queue.append(words)
 
     # Do the first default payload to see what the intial output should be.
-    p = get_process(filepath)
-    p.sendline(words)
-    output = p.recvline()
-    found_paths.append(output)
+    send_to_process(words, filepath)
 
     for item in queue:
         d = copy.deepcopy(item)
@@ -135,38 +147,16 @@ def fuzz_jpeg(filepath, words):
 '''
 Begins the mutation process
 '''
-def perform_mutation(filepath, data, i):
-    if i == 0:
-        print("> Testing Normal Payload")
-        if send_to_process(get_process(filepath), data, filepath):
-            return True
-    elif i == 1:
-        print("> Testing Sending Nothing")
-        if send_to_process(get_process(filepath), '', filepath):
-            return True
-    elif i == 2:
-        if swap_jpeg_bytes(filepath, data):
-            return True
-    elif i == 3:
-        if remove_jpeg_bytes(filepath, data):
-            return True
-    elif i == 4:
-        if change_magic_bytes(filepath, data):
-            return True
-    elif i == 5:
-        if change_start_end_bytes(filepath, data):
-            return True
-    elif i == 6:
-        if remove_random_bytes(filepath, data):
-            return True
-    elif i == 7:
-        if insert_random_bytes(filepath, data):
-            return True
-    elif i == 8:
-        if reverse_bytes(filepath, data):
-            return True
-    else:
-        return False
+def perform_mutation(filepath, data):
+    if send_to_process('', filepath): return True
+    if swap_jpeg_bytes(filepath, data): return True
+    if remove_jpeg_bytes(filepath, data): return True
+    if change_magic_bytes(filepath, data): return True
+    if change_start_end_bytes(filepath, data): return True
+    if remove_random_bytes(filepath, data): return True
+    if insert_random_bytes(filepath, data): return True
+    if reverse_bytes(filepath, data): return True
+    return False
 
 '''
 Replaces special bytes with other special bytes
@@ -176,10 +166,9 @@ def swap_jpeg_bytes(filepath, data):
     for original in file_struct_arr:
         for replacement in file_struct_arr:
             if (original is not replacement):
-                print(f"Replacing {original} with {replacement}")
                 newdata = data.replace(original, replacement)
 
-                if send_to_process(get_process(filepath), newdata, filepath):
+                if send_to_process(newdata, filepath):
                     return True
     return False
 
@@ -189,10 +178,9 @@ Removes special bytes from the text
 def remove_jpeg_bytes(filepath, data):
     print("Removing JPEG Bytes")
     for original in file_struct_arr:
-        print(f"Renmoving {original}")
         newdata = data.replace(original, b"")
 
-        if send_to_process(get_process(filepath), newdata, filepath):
+        if send_to_process(newdata, filepath):
             return True
     return False
 
@@ -203,9 +191,7 @@ def change_magic_bytes(filepath, data):
     print("Changing Magic Bytes")
     for magic in magic_bytes_arr:
         newdata = magic + data[12:]
-        print(f"Testing {newdata}")
-
-        if send_to_process(get_process(filepath), newdata, filepath):
+        if send_to_process( newdata, filepath):
             return True
     return False
 
@@ -217,7 +203,7 @@ def change_start_end_bytes(filepath, data):
     newdata = data.replace(END_IMAGE, START_IMAGE)
     newdata = newdata.replace(START_IMAGE, END_IMAGE, 1) # only replaces the first instance
 
-    if send_to_process(get_process(filepath), newdata, filepath):
+    if send_to_process(newdata, filepath):
             return True
     return False
 
@@ -230,7 +216,7 @@ def remove_random_bytes(filepath, data):
     for i in range(0, 100):
         newdata = remove_random_bytes_util(data, i)
 
-        if send_to_process(get_process(filepath), newdata, filepath):
+        if send_to_process(newdata, filepath):
             return True
     return False
 
@@ -242,7 +228,7 @@ def insert_random_bytes(filepath, data):
     for i in range(0, 100):
         newdata = insert_random_bytes_util(data, i)
 
-        if send_to_process(get_process(filepath), newdata, filepath):
+        if send_to_process(newdata, filepath):
             return True
     return False
 
@@ -251,7 +237,7 @@ Reverses the entire payload cause why not
 '''
 def reverse_bytes(filepath, data):
     print("Reversing the Entire Thing")
-    if send_to_process(get_process(filepath), data[::-1], filepath):
+    if send_to_process(data[::-1], filepath):
             return True
     return False
 

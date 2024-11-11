@@ -1,8 +1,9 @@
-from pwn import *
 import copy
 import os
 import string
 import random
+import subprocess
+import time
 from utils import *
 from math import pi
 
@@ -15,6 +16,7 @@ NUM_MUTATIONS = 100
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
+PRINT_OUTPUTS = False
 
 format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
 ascii_controls = ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08',
@@ -32,34 +34,42 @@ no_output = False
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
-def send_to_process(p, payload, filepath):
+def send_to_process(payload, filepath):
     if SEE_INPUTS:
         print(payload)
     
     try:
-        p.sendline(payload)
-    except:
-        print('You broke the payload... Oops')
+        process = subprocess.run(
+            [filepath],
+            input=payload,
+            text=True,
+            capture_output=True
+        )
+        
+        # Capture the return code and output
+        code = process.returncode
+        output = process.stdout
 
-    if not no_output:
-        try: 
-            output = p.recvline()
-            if output == "":
-                pass
-            # A different traversal path has been found and hence it is added to the queue
-            elif output not in found_paths:
-                # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-                if not ("invalid" in output or "Invalid" in output):
-                    queue.append(payload) # Add the current payload into the queue
-                    found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-                    print_new_path_found()
-        except:
-            pass
-            # print("Exception in Recvline Caused (Possibly due to no Output)")
+        if PRINT_OUTPUTS:
+            print(output)
+        
+    except Exception as e:
+        print(e)
+        return False
+    
+    if output == "":
+        pass
+    # A different traversal path has been found and hence it is added to the queue
+    elif output not in found_paths:
+        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+        if not ("invalid" in output or "Invalid" in output):
+            # Add the current payload into the queue
+            queue.append(payload)
 
-    p.proc.stdin.close()
-
-    code = p.poll(True)
+            # Adds the output so we don't encounter it again and keep appending 
+            found_paths.append(output)
+            print_new_path_found()
+            time.sleep(1)
     
     if code != 0:
         write_crash_output(filepath, str(payload))
@@ -74,13 +84,7 @@ def fuzz_plaintext(filepath, words):
     queue.append(words)
 
     # Do the first default payload to see what the intial output should be.
-    p = get_process(filepath)
-    p.sendline(words)
-    try:
-        output = p.recvline()
-        found_paths.append(output)
-    except:
-        no_output = True
+    send_to_process(words, filepath)
 
     for item in queue:
         d = copy.deepcopy(item)
@@ -94,7 +98,7 @@ def fuzz_plaintext(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data):
-    if send_to_process(get_process(filepath), '', filepath): return True
+    if send_to_process('', filepath): return True
     if send_wordlist(filepath): return True
     if flip_bits(filepath, data): return True
     if add_random_bytes(filepath, data): return True
@@ -113,8 +117,7 @@ def send_wordlist(filepath):
     print('Sending Wordlist allnumber')
     with open('./src/wordlists/allnumber.txt', 'r') as file:
         for line in file:
-            p = get_process(filepath)
-            if send_to_process(p, line.strip(), filepath):
+            if send_to_process(line.strip(), filepath):
                 file.close()
                 return True
     file.close()
@@ -122,8 +125,7 @@ def send_wordlist(filepath):
     print("Sending wordlist naughtystrings")
     with open('./src/wordlists/naughtystrings.txt', 'r') as file:
         for line in file:
-            p = get_process(filepath)
-            if send_to_process(p, line.strip(), filepath):
+            if send_to_process(line.strip(), filepath):
                 file.close()
                 return True
     file.close()
@@ -137,8 +139,7 @@ def flip_bits(filepath, data):
     print("Flipping bits")
     for num in range(0, len(data) * 50):
         flipped = uflip_bits(data, num)
-        p = get_process(filepath)
-        if send_to_process(p, flipped, filepath):
+        if send_to_process(flipped, filepath):
             return True
     return False
 
@@ -149,8 +150,7 @@ def add_random_bytes(filepath, data):
     print("Adding in random bytes")
     for num in range(0, 500): # TODO: Increased this because it crashes plaintext3 sometimes
         with_random = uadd_random_bytes(data, num)
-        p = get_process(filepath)
-        if send_to_process(p, with_random, filepath):
+        if send_to_process(with_random, filepath):
             return True
     return False
 
@@ -161,8 +161,7 @@ def add_long_strings_ascii(filepath, data):
     print("Adding in long strings (ASCII)")
     for num in range(0, 1000):
         longdata = data + (random.choice(string.ascii_letters).encode('utf-8') * num)
-        p = get_process(filepath)
-        if send_to_process(p, longdata, filepath):
+        if send_to_process(longdata, filepath):
             return True
     return False
 
@@ -173,8 +172,7 @@ def add_long_strings_printable(filepath, data):
     print("Adding in long strings (Printable)")
     for num in range(0, 1000):
         longdata = data + (random.choice(string.printable).encode('utf-8') * num)
-        p = get_process(filepath)
-        if send_to_process(p, longdata, filepath):
+        if send_to_process(longdata, filepath):
             return True
     return False
 
@@ -185,8 +183,7 @@ def send_massive(filepath):
     print("Sending Massive Strings")
     for num in range(1, 11):
         massive = b'A' * (10000 * num)
-        p = get_process(filepath)
-        if send_to_process(p, massive, filepath):
+        if send_to_process(massive, filepath):
             return True
     return False
 
@@ -202,8 +199,7 @@ def send_format_strings(filepath):
             else:
                 format_string = f'%{num}${format_spec}'.encode('utf-8')
             
-            p = get_process(filepath)
-            if send_to_process(p, format_string, filepath):
+            if send_to_process(format_string, filepath):
                 return True
     return False
 
@@ -215,8 +211,7 @@ def insert_ascii_control(filepath, data):
     for control in ascii_controls:
         for num in range(0, 10):
             new = insert_random_character(data, control)
-            p = get_process(filepath)
-            if send_to_process(p, new, filepath):
+            if send_to_process(new, filepath):
                 return True
     return False
 

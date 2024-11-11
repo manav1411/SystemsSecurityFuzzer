@@ -1,4 +1,3 @@
-from pwn import *
 import json
 import copy
 import time
@@ -33,7 +32,7 @@ def is_json(words):
 Sends a given input to a process, then returns whether the process crashes or not
 > JSON specific <
 '''
-def send_to_process(payload, filepath, original=False):
+def send_to_process(payload, filepath):
     payload = json.dumps(payload)
     if SEE_INPUTS:
         print(payload)
@@ -69,7 +68,7 @@ def send_to_process(payload, filepath, original=False):
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)
             print_new_path_found()
-            time.sleep(2)
+            time.sleep(1)
     
     if code != 0:
         write_crash_output(filepath, json.dumps(payload))
@@ -81,12 +80,9 @@ def send_to_process(payload, filepath, original=False):
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
-    words = words.decode("utf-8")
-    queue.append(json.loads(words))
+    words = json.loads(words.decode("utf-8"))
 
-    # Do the first default payload to see what the intial output should be.
-    # Added some tests for JSON running slowly, think it it because it waits for a return that takes a while
-    send_to_process(words, filepath, True)
+    send_to_process(words, filepath)
 
     for item in queue:
         print(queue)
@@ -102,11 +98,11 @@ def fuzz_json(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data: json):
-    #if send_to_process('', filepath): return True
-    #if add_fields(data, filepath): return True
-    #if remove_fields(data, filepath): return True
-    #if mutate_nums(data, filepath): return True
-    #if mutate_strings(data, filepath): return True
+    if send_to_process('', filepath): return True
+    if add_fields(data, filepath): return True
+    if remove_fields(data, filepath): return True
+    if mutate_nums(data, filepath): return True
+    if mutate_strings(data, filepath): return True
     if flip_bits(data, filepath): return True
     if swap_types(data, filepath): return True
     return False

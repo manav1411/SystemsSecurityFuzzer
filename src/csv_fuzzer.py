@@ -1,11 +1,9 @@
-from pwn import *
 import io
 import csv
 import copy
 import random
 import string
-import signal
-import datetime
+import subprocess
 import time
 from math import pi
 from utils import *
@@ -98,38 +96,43 @@ def list_to_csv(data, delimiter=','):
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
-def send_to_process(p, csv_payload, filepath):
+def send_to_process(csv_payload, filepath):
     payload = list_to_csv(csv_payload, ',')
     if SEE_INPUTS:
         print(payload)
-    p.sendline(payload)
-
-    signal.alarm(5)
-
-    try: 
-        output = p.recvline()
-        if PRINT_OUTPUTS:
-            print(f"Output: {output}")
-        # A different traversal path has been found and hence it is added to the queue
-        elif output not in found_paths:
-            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-            if not ("invalid" in output or "Invalid" in output):
-                queue.append(csv_payload) # Add the current payload into the queue
-                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-                print_new_path_found()
-    except:
-        signal.alarm(0)
-        pass
-    finally:
-        signal.alarm(0)
-
-    signal.alarm(5)
 
     try:
-        p.proc.stdin.close()
-        code = p.poll(True)
-    finally:
-        signal.alarm(0)
+        process = subprocess.run(
+            [filepath],
+            input=payload,
+            text=True,
+            capture_output=True
+        )
+        
+        # Capture the return code and output
+        code = process.returncode
+        output = process.stdout
+
+        if PRINT_OUTPUTS:
+            print(output)
+        
+    except Exception as e:
+        print(e)
+        return False
+    
+    if output == "":
+        pass
+    # A different traversal path has been found and hence it is added to the queue
+    elif output not in found_paths:
+        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+        if not ("invalid" in output or "Invalid" in output):
+            # Add the current payload into the queue
+            queue.append(payload)
+
+            # Adds the output so we don't encounter it again and keep appending 
+            found_paths.append(output)
+            print_new_path_found()
+            time.sleep(1)
     
     if code != 0:
         write_crash_output(filepath, payload)
@@ -140,14 +143,44 @@ def send_to_process(p, csv_payload, filepath):
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
-def send_to_process_newdelim(p, csv_payload, filepath, delimiter):
+def send_to_process_newdelim(csv_payload, filepath, delimiter):
     payload = list_to_csv(csv_payload, delimiter)
-    p.sendline(payload)
-    p.proc.stdin.close()
+    if SEE_INPUTS:
+        print(payload)
 
-    code = p.poll(True)
-    p.close()
+    try:
+        process = subprocess.run(
+            [filepath],
+            input=payload,
+            text=True,
+            capture_output=True
+        )
+        
+        # Capture the return code and output
+        code = process.returncode
+        output = process.stdout
 
+        if PRINT_OUTPUTS:
+            print(output)
+        
+    except Exception as e:
+        print(e)
+        return False
+    
+    if output == "":
+        pass
+    # A different traversal path has been found and hence it is added to the queue
+    elif output not in found_paths:
+        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+        if not ("invalid" in output or "Invalid" in output):
+            # Add the current payload into the queue
+            queue.append(payload)
+
+            # Adds the output so we don't encounter it again and keep appending 
+            found_paths.append(output)
+            print_new_path_found()
+            time.sleep(1)
+    
     if code != 0:
         write_crash_output(filepath, payload)
         return True
@@ -161,10 +194,7 @@ def fuzz_csv(filepath, words):
     queue.append(csv_to_list(words))
 
     # Do the first default payload to see what the intial output should be.
-    p = get_process(filepath)
-    p.sendline(words)
-    output = p.recvline()
-    found_paths.append(output)
+    send_to_process(words, filepath)
 
     for item in queue:
         d = copy.deepcopy(item)
@@ -199,7 +229,7 @@ def add_rows(data: list, filepath):
     d = copy.deepcopy(data)
     rowlen = len(d[0])
     for i in range(1, 101):
-        p = get_process(filepath)
+        
 
         row = []
         for i in range(0, rowlen):
@@ -207,7 +237,7 @@ def add_rows(data: list, filepath):
 
         d.append(row)
 
-        if send_to_process(p, d, filepath):
+        if send_to_process(d, filepath):
             return True
 
     return False
@@ -219,12 +249,12 @@ def add_cols(data: list, filepath):
     print("> Testing Adding Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
-        p = get_process(filepath)
+        
 
         for row in d:
             row.append(random.choice(string.ascii_letters))
 
-        if send_to_process(p, d, filepath):
+        if send_to_process(d, filepath):
             return True
 
     return False
@@ -236,7 +266,7 @@ def add_cols_and_rows(data: list, filepath):
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
-        p = get_process(filepath)
+        
         for row in d:
             row.append(random.choice(string.ascii_letters))
 
@@ -247,7 +277,7 @@ def add_cols_and_rows(data: list, filepath):
 
         d.append(newrow)
 
-        if send_to_process(p, d, filepath):
+        if send_to_process(d, filepath):
             return True
 
     return False
@@ -265,10 +295,10 @@ def mutate_data_ints(data: list, filepath):
                 with open('./src/wordlists/allnumber.txt', 'r') as file:
                     for line in file:
                         d = copy.deepcopy(data)
-                        p = get_process(filepath)
+                        
                         d[i][j] = line.strip()
                         
-                        if (send_to_process(p, d, filepath)):
+                        if (send_to_process(d, filepath)):
                             file.close()
                             return True
                     file.close()
@@ -286,10 +316,10 @@ def mutate_data_values_with_delimiters(data: list, filepath):
             for j in range (0, width):
                 for delim in delimiters_mutations_arr:
                     d = copy.deepcopy(data)
-                    p = get_process(filepath)
+                    
                     d[i][j] = delim
 
-                    if send_to_process(p, d, filepath):
+                    if send_to_process(d, filepath):
                         return True
     return False
 
@@ -297,9 +327,9 @@ def mutate_delimiters(data: list, filepath):
     print("Mutating delimiters")
     for delim in delimiters_mutations_arr:
         d = copy.deepcopy(data)
-        p = get_process(filepath)
+        
 
-        if send_to_process_newdelim(p, d, filepath, delim):
+        if send_to_process_newdelim(d, filepath, delim):
             return True
 
 def flip_bits(data: list, filepath, numflips):
@@ -322,8 +352,8 @@ def flip_bits(data: list, filepath, numflips):
 
                     d[i][j] = back_to_string
 
-                    p = get_process(filepath)
-                    if send_to_process(p, d, filepath):
+                    
+                    if send_to_process(d, filepath):
                         return True
     return False
 
@@ -337,10 +367,10 @@ def mutate_strings(data: list, filepath):
                 with open('./src/wordlists/naughtystrings.txt', 'r') as file:
                     for line in file:
                         d = copy.deepcopy(data)
-                        p = get_process(filepath)
+                        
                         d[i][j] = line.strip()
                         
-                        if (send_to_process(p, d, filepath)):
+                        if (send_to_process(d, filepath)):
                             file.close()
                             return True
                     file.close()
@@ -355,9 +385,9 @@ def mutate_index(data: list, filepath):
             for j in range (0, width):
                 d = copy.deepcopy(data)
                 for x in range (0, 100):
-                    p = get_process(filepath)
+                    
                     d[i][j] = 'A' * x
-                    if send_to_process(p, d, filepath):
+                    if send_to_process(d, filepath):
                         return True
     return False
 
