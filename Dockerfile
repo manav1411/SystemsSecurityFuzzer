@@ -9,8 +9,5 @@ ADD example_inputs /example_inputs
 ADD src /src
 RUN chmod +x /binaries/*
 
-# Install all dependencies
-RUN pip install --upgrade pwntools
-
 # Run it.
 CMD ["python3", "./fuzzer.py"]

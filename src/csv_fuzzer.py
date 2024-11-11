@@ -16,8 +16,8 @@ NUM_MUTATIONS = 100
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = True
-PRINT_OUTPUTS = True
+SEE_INPUTS = False
+PRINT_OUTPUTS = False
 
 
 # Defines for Mutations
@@ -127,7 +127,7 @@ def send_to_process(csv_payload, filepath):
         # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
         if not ("invalid" in output or "Invalid" in output):
             # Add the current payload into the queue
-            queue.append(payload)
+            queue.append(csv_to_list(payload))
 
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)
@@ -174,7 +174,7 @@ def send_to_process_newdelim(csv_payload, filepath, delimiter):
         # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
         if not ("invalid" in output or "Invalid" in output):
             # Add the current payload into the queue
-            queue.append(payload)
+            queue.append(csv_to_list(payload))
 
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)

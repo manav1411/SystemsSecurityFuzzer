@@ -8,8 +8,8 @@ import subprocess
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = True
-PRINT_OUTPUTS = True
+SEE_INPUTS = False
+PRINT_OUTPUTS = False
 
 arr_of_types = ["A" * 400, -1389054671389658013709571389065891365890189164, json.loads('{"Name": "Jennifer Smith"}'), ["A", 1234, "Meow", -9999], None, True, False]
 type_swaps_arr = ["A" * 2000, -9999999999999999999999999999999999999999999999999999999999999999999, json.loads('{"Name": "Jennifer Smith","Contact Number": 7867567898,"Email": "jen123@gmail.com","Hobbies":["Reading", "Sketching", "Horse Riding"]}'), arr_of_types, None, True, False]
