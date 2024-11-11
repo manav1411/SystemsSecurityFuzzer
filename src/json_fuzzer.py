@@ -1,13 +1,16 @@
 from pwn import *
 import json
 import copy
+import time
 from math import pi
 from utils import *
+import subprocess
 
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
+PRINT_OUTPUTS = True
 
 arr_of_types = ["A" * 400, -1389054671389658013709571389065891365890189164, json.loads('{"Name": "Jennifer Smith"}'), ["A", 1234, "Meow", -9999], None, True, False]
 type_swaps_arr = ["A" * 2000, -9999999999999999999999999999999999999999999999999999999999999999999, json.loads('{"Name": "Jennifer Smith","Contact Number": 7867567898,"Email": "jen123@gmail.com","Hobbies":["Reading", "Sketching", "Horse Riding"]}'), arr_of_types, None, True, False]
@@ -30,30 +33,43 @@ def is_json(words):
 Sends a given input to a process, then returns whether the process crashes or not
 > JSON specific <
 '''
-def send_to_process(p, payload, filepath):
-    payload = json.dumps(payload).encode('utf-8')
+def send_to_process(payload, filepath, original=False):
+    payload = json.dumps(payload)
     if SEE_INPUTS:
         print(payload)
     
-    p.sendline(payload)
+    try:
+        process = subprocess.run(
+            [filepath],
+            input=payload,
+            text=True,
+            capture_output=True
+        )
+        
+        # Capture the return code and output
+        code = process.returncode
+        output = process.stdout
 
-    try: 
-        output = p.recvline()
-        if output == "":
-            pass
-        # A different traversal path has been found and hence it is added to the queue
-        elif output not in found_paths:
-            # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-            if not ("invalid" in output or "Invalid" in output):
-                queue.append(payload) # Add the current payload into the queue
-                found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
-                print_new_path_found()
-    except:
-        print("Exception in Recvline Caused")
+        if PRINT_OUTPUTS:
+            print(output)
+        
+    except Exception as e:
+        print(e)
+        return False
+    
+    if output == "":
+        pass
+    # A different traversal path has been found and hence it is added to the queue
+    elif output not in found_paths:
+        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+        if not ("invalid" in output or "Invalid" in output):
+            # Add the current payload into the queue
+            queue.append(json.loads(payload))
 
-    p.proc.stdin.close()
-
-    code = p.poll(True)
+            # Adds the output so we don't encounter it again and keep appending 
+            found_paths.append(output)
+            print_new_path_found()
+            time.sleep(2)
     
     if code != 0:
         write_crash_output(filepath, json.dumps(payload))
@@ -65,14 +81,12 @@ def send_to_process(p, payload, filepath):
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
+    words = words.decode("utf-8")
     queue.append(json.loads(words))
 
     # Do the first default payload to see what the intial output should be.
     # Added some tests for JSON running slowly, think it it because it waits for a return that takes a while
-    p = get_process(filepath)
-    p.sendline(words)
-    output = p.recvline()
-    found_paths.append(output)
+    send_to_process(words, filepath, True)
 
     for item in queue:
         print(queue)
@@ -88,28 +102,29 @@ def fuzz_json(filepath, words):
 Begins the mutation process
 '''
 def perform_mutation(filepath, data: json):
-    if send_to_process(get_process(filepath), '', filepath): return True
-    if add_fields(data, filepath): return True
-    if remove_fields(data, filepath): return True
-    if mutate_nums(data, filepath): return True
-    if mutate_strings(data, filepath): return True
+    #if send_to_process('', filepath): return True
+    #if add_fields(data, filepath): return True
+    #if remove_fields(data, filepath): return True
+    #if mutate_nums(data, filepath): return True
+    #if mutate_strings(data, filepath): return True
     if flip_bits(data, filepath): return True
     if swap_types(data, filepath): return True
     return False
+
 '''
 Adds 1 - 10 New Fields
 '''
 def add_fields(data: json, filepath):
     print("> Testing Adding Fields")
     for i in range(1, 11):
-        p = get_process(filepath)
+        
         print(f"  > Adding {i} Extra Field(s)")
         d = copy.deepcopy(data)
 
         for j in range (0, i):
             d[f"RandomField{j}"] = f"RandomValue{j}"
         
-        if send_to_process(p, d, filepath):
+        if send_to_process(d, filepath):
             return True
         
     return False
@@ -121,12 +136,12 @@ def remove_fields(data: json, filepath):
     print("> Testing Removing Fields")
     keys = data.keys()  
     for keyValue in keys:
-        p = get_process(filepath)
+        
         d = copy.deepcopy(data)
         print(f"    > Deleting Field {keyValue}")
         del d[keyValue]
 
-        if send_to_process(p, d, filepath):
+        if send_to_process(d, filepath):
             return True
         
     return False
@@ -145,10 +160,10 @@ def mutate_nums(data: json, filepath):
         with open('./src/wordlists/allnumber.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
-                p = get_process(filepath)
+                
                 d[keyValue] = line
                 
-                if (send_to_process(p, d, filepath)):
+                if (send_to_process(d, filepath)):
                     file.close()
                     return True
             file.close()
@@ -168,10 +183,10 @@ def mutate_strings(data: json, filepath):
         with open('./src/wordlists/naughtystrings.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
-                p = get_process(filepath)
+                
                 d[keyValue] = line
                 
-                if (send_to_process(p, d, filepath)):
+                if (send_to_process(d, filepath)):
                     file.close()
                     return True
             file.close()
@@ -185,16 +200,15 @@ def flip_bits(data: json, filepath):
     keys = data.keys()
 
     for keyValue in keys:
-        for i in range(0, len(data[keyValue] * 20)):
+        for i in range(0, 100):
             d = copy.deepcopy(data)
-            p = get_process(filepath)
-
+            
             if is_num(d[keyValue]):
                 d[keyValue] = ubits_to_number(uflip_bits(unumber_to_bits(d[keyValue])))
             elif is_str(d[keyValue]):
                 d[keyValue] = ubits_to_string(uflip_bits(ustring_to_bits(d[keyValue])))
 
-            if (send_to_process(p, d, filepath)):
+            if (send_to_process(d, filepath)):
                 return True
             
     return False
@@ -209,10 +223,10 @@ def swap_types(data: json, filepath):
     for keyValue in keys:
         for type in type_swaps_arr:
             d = copy.deepcopy(data)
-            p = get_process(filepath)
+            
 
             d[keyValue] = type
 
-            if (send_to_process(p, d, filepath)):
+            if (send_to_process(d, filepath)):
                 return True
     return False

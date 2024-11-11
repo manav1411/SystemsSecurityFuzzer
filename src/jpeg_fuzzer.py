@@ -125,11 +125,10 @@ def fuzz_jpeg(filepath, words):
     found_paths.append(output)
 
     for item in queue:
-        for i in range(0, NUM_MUTATIONS):
-            d = copy.deepcopy(item)
-            if perform_mutation(filepath, d, i):
-                print_crash_found()
-                exit()
+        d = copy.deepcopy(item)
+        if perform_mutation(filepath, d):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
 

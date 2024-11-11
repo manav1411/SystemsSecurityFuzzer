@@ -83,45 +83,26 @@ def fuzz_plaintext(filepath, words):
         no_output = True
 
     for item in queue:
-        for i in range(0, NUM_MUTATIONS):
-            d = copy.deepcopy(item)
-            if perform_mutation(filepath, d, i):
-                print_crash_found()
-                exit()
+        d = copy.deepcopy(item)
+        if perform_mutation(filepath, d):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
 
 '''
 Begins the mutation process
 '''
-def perform_mutation(filepath, data, i):
-    if i == 0:
-        print("> Testing Sending Nothing")
-        if send_to_process(get_process(filepath), '', filepath):
-            return True
-    elif i == 1:
-        if send_wordlist(filepath):
-            return True
-    elif i == 2:
-        if flip_bits(filepath, data):
-            return True
-    elif i == 3:
-        if add_random_bytes(filepath, data):
-            return True
-    elif i == 4:
-        if add_long_strings_ascii(filepath, data):
-            return True
-    elif i == 5:
-        if add_long_strings_printable(filepath, data):
-            return True
-    elif i == 6:
-        if send_massive(filepath):
-            return True
-    elif i == 7:
-        if send_format_strings(filepath):
-            return True
-    else:
-        return False
+def perform_mutation(filepath, data):
+    if send_to_process(get_process(filepath), '', filepath): return True
+    if send_wordlist(filepath): return True
+    if flip_bits(filepath, data): return True
+    if add_random_bytes(filepath, data): return True
+    if add_long_strings_ascii(filepath, data): return True
+    if add_long_strings_printable(filepath, data): return True
+    if send_massive(filepath): return True
+    if send_format_strings(filepath): return True
+    return False
     
 '''
 Using the defined wordlists we send a significant ammount of varying inputs

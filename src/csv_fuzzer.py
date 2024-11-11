@@ -6,6 +6,7 @@ import random
 import string
 import signal
 import datetime
+import time
 from math import pi
 from utils import *
 
@@ -103,6 +104,8 @@ def send_to_process(p, csv_payload, filepath):
         print(payload)
     p.sendline(payload)
 
+    signal.alarm(5)
+
     try: 
         output = p.recvline()
         if PRINT_OUTPUTS:
@@ -115,11 +118,18 @@ def send_to_process(p, csv_payload, filepath):
                 found_paths.append(output) # Adds the output so we don't encounter it again and keep appending
                 print_new_path_found()
     except:
+        signal.alarm(0)
         pass
+    finally:
+        signal.alarm(0)
 
-    p.proc.stdin.close()
+    signal.alarm(5)
 
-    code = p.poll(True)
+    try:
+        p.proc.stdin.close()
+        code = p.poll(True)
+    finally:
+        signal.alarm(0)
     
     if code != 0:
         write_crash_output(filepath, payload)
@@ -157,55 +167,29 @@ def fuzz_csv(filepath, words):
     found_paths.append(output)
 
     for item in queue:
-        for i in range(0, NUM_MUTATIONS):
-            deepcopy = copy.deepcopy(item)
+        d = copy.deepcopy(item)
 
-            if perform_mutation(filepath, deepcopy, i):
-                print_crash_found()
-                exit()
+        if perform_mutation(filepath, d):
+            print_crash_found()
+            exit()
 
     print_no_crash_found()
 
 '''
 Begins the mutation process with a range of CSV files
 '''
-def perform_mutation(filepath, data, i):
-    if i == 0:
-        pass # clean up later
-    elif i == 1:
-        pass # clean up later
-    elif i == 2:
-        if add_rows(data, filepath):
-            return True
-    elif i == 3:
-        if add_cols(data, filepath):
-            return True
-    elif i == 4:
-        if add_cols_and_rows(data, filepath):
-            return True
-    elif i == 5:
-        if mutate_data_ints(data, filepath):
-            return True
-    elif i == 6:
-        if mutate_data_values_with_delimiters(data, filepath):
-            return True
-    elif i == 7:
-        if mutate_delimiters(data, filepath):
-            return True
-    elif i == 8:
-        if flip_bits(data, filepath, 50):
-            return True
-    elif i == 10:
-        if mutate_index(data, filepath):
-            return True
-    elif i == 11:
-        if mutate_strings(data, filepath):
-            return True
-    elif i == 12:
-        if stack_smash(filepath, 250):
-            return True
-    else:
-        return False
+def perform_mutation(filepath, data):
+    if add_rows(data, filepath): return True
+    if add_cols(data, filepath): return True
+    if add_cols_and_rows(data, filepath): return True
+    if mutate_data_ints(data, filepath): return True
+    if mutate_data_values_with_delimiters(data, filepath): return True
+    if mutate_delimiters(data, filepath): return True
+    if flip_bits(data, filepath, 50): return True
+    if mutate_index(data, filepath): return True
+    if mutate_strings(data, filepath): return True
+    if stack_smash(filepath, 250): return True
+    return False
 
 '''
 Adds 1 - 10 New Rows
@@ -278,35 +262,16 @@ def mutate_data_ints(data: list, filepath):
 
     for i in range(0, height):
             for j in range (0, width):
-                for num in num_mutations_arr:
-                    d = copy.deepcopy(data)
-                    p = get_process(filepath)
-                    d[i][j] = num
-
-                    if send_to_process(p, d, filepath):
-                        return True
-
-                for x in range(0, 10):
-                    if not is_num(data[i][j]):
-                        continue
-                    d = copy.deepcopy(data)
-                    p = get_process(filepath)
-                    curr = d[i][j]
-
-                    if x == 0:
-                        d[i][j] = int(curr)
-                    elif x == 1:
-                        d[i][j] = curr * 1.0
-                    elif x == 2:
-                        d[i][j] = curr * -1
-                    elif x == 3:
-                        d[i][j] = str(curr)
-                    else:
-                        p.proc.stdin.close()
-                        break
-
-                    if send_to_process(p, d, filepath):
-                        return True
+                with open('./src/wordlists/allnumber.txt', 'r') as file:
+                    for line in file:
+                        d = copy.deepcopy(data)
+                        p = get_process(filepath)
+                        d[i][j] = line.strip()
+                        
+                        if (send_to_process(p, d, filepath)):
+                            file.close()
+                            return True
+                    file.close()
     return False
 
 '''
@@ -369,15 +334,16 @@ def mutate_strings(data: list, filepath):
 
     for i in range(0, height):
             for j in range (0, width):
-                d = copy.deepcopy(data)
-                curr = d[i][j]
-
-                for delim in delimiters_mutations_arr:
-                    p = get_process(filepath)
-                    rand = replace_random_with_value(curr, delim)
-                    d[i][j] = rand
-                    if send_to_process(p, d, filepath):
-                        return True
+                with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+                    for line in file:
+                        d = copy.deepcopy(data)
+                        p = get_process(filepath)
+                        d[i][j] = line.strip()
+                        
+                        if (send_to_process(p, d, filepath)):
+                            file.close()
+                            return True
+                    file.close()
     return False
 
 def mutate_index(data: list, filepath):
@@ -388,7 +354,7 @@ def mutate_index(data: list, filepath):
     for i in range(0, height):
             for j in range (0, width):
                 d = copy.deepcopy(data)
-                for x in range (0, 1000):
+                for x in range (0, 100):
                     p = get_process(filepath)
                     d[i][j] = 'A' * x
                     if send_to_process(p, d, filepath):
