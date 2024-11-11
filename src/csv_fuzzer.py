@@ -218,7 +218,6 @@ def perform_mutation(filepath, data):
     if flip_bits(data, filepath, 50): return True
     if mutate_index(data, filepath): return True
     if mutate_strings(data, filepath): return True
-    if stack_smash(filepath, 250): return True
     return False
 
 '''
@@ -230,7 +229,6 @@ def add_rows(data: list, filepath):
     rowlen = len(d[0])
     for i in range(1, 101):
         
-
         row = []
         for i in range(0, rowlen):
             row.append(random.choice(string.ascii_letters))
@@ -250,7 +248,6 @@ def add_cols(data: list, filepath):
     d = copy.deepcopy(data)
     for i in range(1, 101):
         
-
         for row in d:
             row.append(random.choice(string.ascii_letters))
 
@@ -323,6 +320,9 @@ def mutate_data_values_with_delimiters(data: list, filepath):
                         return True
     return False
 
+'''
+Mutates the delimiters for the CSV File
+'''
 def mutate_delimiters(data: list, filepath):
     print("Mutating delimiters")
     for delim in delimiters_mutations_arr:
@@ -332,6 +332,9 @@ def mutate_delimiters(data: list, filepath):
         if send_to_process_newdelim(d, filepath, delim):
             return True
 
+'''
+Flips bits of the values contained within the CSV
+'''
 def flip_bits(data: list, filepath, numflips):
     width = len(data[0])
     height = len(data)
@@ -357,7 +360,9 @@ def flip_bits(data: list, filepath, numflips):
                         return True
     return False
 
-
+'''
+Mutates the strings within the CSV
+'''
 def mutate_strings(data: list, filepath):
     width = len(data[0])
     height = len(data)
@@ -376,6 +381,9 @@ def mutate_strings(data: list, filepath):
                     file.close()
     return False
 
+'''
+Tries to add 1 - 1000 length strings in each index of the CSV
+'''
 def mutate_index(data: list, filepath):
     print("Mutating indexes with string of len 0 - 100")
     width = len(data[0])
@@ -384,14 +392,16 @@ def mutate_index(data: list, filepath):
     for i in range(0, height):
             for j in range (0, width):
                 d = copy.deepcopy(data)
-                for x in range (0, 100):
+                for x in range (0, 1000):
                     
                     d[i][j] = 'A' * x
                     if send_to_process(d, filepath):
                         return True
     return False
 
-
+'''
+Replaces a random value with another random value
+'''
 def replace_random_with_value(string, replacement):
     if not string:  # If the string is empty, return it as-is
         return string
@@ -407,19 +417,3 @@ def replace_random_with_value(string, replacement):
 
     # Join the list back into a string and return it
     return ''.join(string_list)
-
-
-'''
-attempts to stack smash the binary with %p
-'''
-def stack_smash(filepath, p_count):
-
-    # Create the payload with %p p_count times in each row, repeated 20 times.
-    payload1 = ['header,' + 'must,' + 'stay,' + 'intact']
-    payload2 = ['%p'*p_count, '%p'*p_count, '%p'*p_count, '%p'*p_count] * 20
-    payload3 = ['%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2, '%p'*p_count*2]
-
-    # Combine the three payloads
-    final_payload = [payload1, payload2, payload3]
-
-    return False

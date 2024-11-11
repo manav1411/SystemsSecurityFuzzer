@@ -30,7 +30,6 @@ def is_json(words):
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
-> JSON specific <
 '''
 def send_to_process(payload, filepath):
     payload = json.dumps(payload)
