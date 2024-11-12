@@ -9,7 +9,7 @@ import threading
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True 
 PRINT_OUTPUTS = False
 
 '''
@@ -29,19 +29,6 @@ crashed = False
 Threads for multithreading
 '''
 threads = []
-
-'''
-Just for fun
-'''
-def progress_bar(current, total, bar_length=20):
-    fraction = current / total
-
-    arrow = int(fraction * bar_length - 1) * '-' + '>'
-    padding = int(bar_length - len(arrow)) * ' '
-
-    ending = '\n' if current == total else '\r'
-
-    print(f'Progress: [{arrow}{padding}] {int(fraction*100)}%', end=ending)
 
 '''
 Returns whether the given data is valid JSON or not
@@ -98,6 +85,8 @@ def send_to_process(payload, filepath):
         global crashed
         crashed = True
         write_crash_output(filepath, json.dumps(payload))
+        progress_bar(1, 1)
+        print_crash_found()
         return True
     else:
         return False
@@ -115,7 +104,6 @@ def fuzz_json(filepath, words):
         print(found_paths)
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
-            print_crash_found()
             exit()
 
     print_no_crash_found()
@@ -135,13 +123,16 @@ def perform_mutation(filepath, data: json):
     for thread in threads:
         thread.start()
 
-    numthreads = threading.active_count()
+    numthreads = (threading.active_count() - 1) # We subtract the main thread
+    workingThreads = 1
 
-    while threading.active_count():
-        progress_bar(numthreads - threading.active_count(), numthreads, 50)
-        if not crashed: continue
-        progress_bar(numthreads, numthreads, 50)
-        return True
+    while workingThreads:
+        workingThreads = threading.active_count() - 1
+        progress_bar(numthreads - workingThreads, numthreads)
+        if crashed: 
+            return True
+
+    return False
 
 '''
 Adds 1 - 10 New Fields
@@ -149,7 +140,7 @@ Adds 1 - 10 New Fields
 def add_fields(data: json, filepath):
     global crashed
     print("> Testing Adding Fields")
-    for i in range(1, 11):
+    for i in range(1,501):
         d = copy.deepcopy(data)
 
         for j in range (0, i):
@@ -239,7 +230,7 @@ def flip_bits(data: json, filepath):
     for keyValue in keys:
         for i in range(0, 100):
             d = copy.deepcopy(data)
-            
+
             if is_num(d[keyValue]):
                 d[keyValue] = ubits_to_number(uflip_bits(unumber_to_bits(d[keyValue])))
             elif is_str(d[keyValue]):

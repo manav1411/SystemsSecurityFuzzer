@@ -7,15 +7,25 @@ def write_crash_output(filename, input):
         file.close()
     print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
 
+def progress_bar(current, total, bar_length=50):
+    fraction = current / total
+
+    arrow = int(fraction * bar_length - 1) * '-' + '>'
+    padding = int(bar_length - len(arrow)) * ' '
+
+    ending = '\n' if current == total else '\r'
+
+    print(f'Progress: [{arrow}{padding}] {int(fraction*100)}%', end=ending)
+
 def print_crash_found():
-    print("#########################################")
-    print("######### Crashable Input Found #########")
-    print("#########################################")
+    print("#" * 67)
+    print("#" * 22 + " Crashable Input Found " + "#" * 22)
+    print("#" * 67)
 
 def print_no_crash_found():
-    print("#########################################")
-    print("####### No Crashable  Input Found #######")
-    print("#########################################")
+    print("#" * 67)
+    print("#" * 20 + " No Crashable  Input Found " + "#" * 20)
+    print("#" * 67)
 
 def print_new_path_found():
     print("# == # == # == # ==== # == # == # == #")
