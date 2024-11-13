@@ -1,7 +1,6 @@
 import json
 import copy
 import time
-from math import pi
 from utils import *
 import subprocess
 import threading
@@ -23,11 +22,17 @@ Queueing for code coverage
 '''
 queue = []
 found_paths = []
-crashed = False
+
+'''
+Timing Things
+'''
+start = 0
+end = 0
 
 '''
 Threads for multithreading
 '''
+crashed = False
 threads = []
 
 '''
@@ -74,19 +79,23 @@ def send_to_process(payload, filepath):
     elif output not in found_paths:
         # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
         if not ("invalid" in output or "Invalid" in output):
+            print(" >> New Path Found, Adding to Queue")
+            print(payload)
+            
             # Add the current payload into the queue
             queue.append(json.loads(payload))
 
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)
-            time.sleep(1)
     
     if code != 0:
         global crashed
         crashed = True
+        end = time.time()
         write_crash_output(filepath, json.dumps(payload))
         progress_bar(1, 1)
         print_crash_found()
+        print_some_facts(len(found_paths), end - start)
         return True
     else:
         return False
@@ -95,16 +104,18 @@ def send_to_process(payload, filepath):
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_json(filepath, words):
+    global start
+    start = time.time()
     words = json.loads(words)
 
     send_to_process(words, filepath)
 
     for item in queue:
-        print(queue)
-        print(found_paths)
+        global threads
+        threads = []
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
-            exit()
+            return
 
     print_no_crash_found()
 
@@ -123,6 +134,7 @@ def perform_mutation(filepath, data: json):
     for thread in threads:
         thread.start()
 
+    print_line()
     numthreads = (threading.active_count() - 1) # We subtract the main thread
     workingThreads = 1
 
@@ -131,16 +143,15 @@ def perform_mutation(filepath, data: json):
         progress_bar(numthreads - workingThreads, numthreads)
         if crashed: 
             return True
-
     return False
 
 '''
-Adds 1 - 10 New Fields
+Adds 1 - 1000 New Fields
 '''
 def add_fields(data: json, filepath):
     global crashed
     print("> Testing Adding Fields")
-    for i in range(1,501):
+    for i in range(1,1001):
         d = copy.deepcopy(data)
 
         for j in range (0, i):
@@ -150,6 +161,7 @@ def add_fields(data: json, filepath):
         if send_to_process(d, filepath):
             crashed = True
             return
+    print("- Finished Adding Fields")
         
 '''
 Removes each of the top level JSON fields
@@ -165,6 +177,7 @@ def remove_fields(data: json, filepath):
         if send_to_process(d, filepath):
             crashed = True
             return
+    print("- Finished Removing Fields")
 
 '''
 Mutates number fields within the JSON to different values
@@ -178,7 +191,7 @@ def mutate_nums(data: json, filepath):
         if not is_num(data[keyValue]):
             continue
 
-        with open('./src/wordlists/allnumber.txt', 'r') as file:
+        with open('./wordlists/allnumber.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
                 
@@ -192,6 +205,7 @@ def mutate_nums(data: json, filepath):
                     crashed = True
                     return
             file.close()
+    print("- Mutating Numbers")
 
 '''
 Mutates string fields within the JSON to different values
@@ -205,7 +219,7 @@ def mutate_strings(data: json, filepath):
         if not is_str(data[keyValue]):
             continue
 
-        with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+        with open('./wordlists/naughtystrings.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
                 
@@ -218,6 +232,7 @@ def mutate_strings(data: json, filepath):
                     crashed = True
                     return
             file.close()
+    print("- Finished Mutating Strings")
 
 '''
 Mutates fields with the bits randomly flipped
@@ -240,6 +255,7 @@ def flip_bits(data: json, filepath):
             if send_to_process(d, filepath):
                 crashed = True
                 return
+    print("- Finished Flipping Bits")
             
 '''
 Swap the types of JSON Fields to other types
@@ -259,3 +275,4 @@ def swap_types(data: json, filepath):
             if send_to_process(d, filepath):
                 crashed = True
                 return
+    print("- Finished Swapping Types")

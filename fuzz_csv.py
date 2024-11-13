@@ -5,6 +5,7 @@ import random
 import string
 import subprocess
 import time
+import threading
 from math import pi
 from utils import *
 
@@ -45,8 +46,24 @@ delimiters_mutations_arr = [
     "}", "[", "]", "\"", "\'", "\0"
 ]
 
+'''
+Queueing for code coverage
+'''
 queue = []
 found_paths = []
+
+'''
+Timing Things
+'''
+start = 0
+end = 0
+
+'''
+Threads for multithreading
+'''
+crashed = False
+threads = []
+
 
 def is_csv(words):
     try:
@@ -126,16 +143,24 @@ def send_to_process(csv_payload, filepath):
     elif output not in found_paths:
         # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
         if not ("invalid" in output or "Invalid" in output):
+            print(" >> New Path Found, Adding to Queue")
+            print(payload)
+            
             # Add the current payload into the queue
             queue.append(csv_to_list(payload))
 
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)
             print_new_path_found()
-            time.sleep(1)
     
     if code != 0:
+        global crashed
+        crashed = True
+        end = time.time()
         write_crash_output(filepath, payload)
+        progress_bar(1, 1)
+        print_crash_found()
+        print_some_facts(len(found_paths), end - start)
         return True
     else:
         return False
@@ -173,6 +198,8 @@ def send_to_process_newdelim(csv_payload, filepath, delimiter):
     elif output not in found_paths:
         # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
         if not ("invalid" in output or "Invalid" in output):
+            print(" >> New Path Found, Adding to Queue")
+            print(payload)
             # Add the current payload into the queue
             queue.append(csv_to_list(payload))
 
@@ -182,7 +209,13 @@ def send_to_process_newdelim(csv_payload, filepath, delimiter):
             time.sleep(1)
     
     if code != 0:
+        global crashed
+        crashed = True
+        end = time.time()
         write_crash_output(filepath, payload)
+        progress_bar(1, 1)
+        print_crash_found()
+        print_some_facts(len(found_paths), end - start)
         return True
     else:
         return False
@@ -191,17 +224,19 @@ def send_to_process_newdelim(csv_payload, filepath, delimiter):
 Main function call to begin fuzzing CSV input binaries
 '''
 def fuzz_csv(filepath, words):
+    global start
+    start = time.time()
     queue.append(csv_to_list(words))
 
     # Do the first default payload to see what the intial output should be.
     send_to_process(words, filepath)
 
     for item in queue:
+        global threads
+        threads = []
         d = copy.deepcopy(item)
-
         if perform_mutation(filepath, d):
-            print_crash_found()
-            exit()
+            return
 
     print_no_crash_found()
 
@@ -209,21 +244,37 @@ def fuzz_csv(filepath, words):
 Begins the mutation process with a range of CSV files
 '''
 def perform_mutation(filepath, data):
-    if add_rows(data, filepath): return True
-    if add_cols(data, filepath): return True
-    if add_cols_and_rows(data, filepath): return True
-    if mutate_data_ints(data, filepath): return True
-    if mutate_data_values_with_delimiters(data, filepath): return True
-    if mutate_delimiters(data, filepath): return True
-    if flip_bits(data, filepath, 50): return True
-    if mutate_index(data, filepath): return True
-    if mutate_strings(data, filepath): return True
+    threads.append(threading.Thread(target=add_rows, args=(data, filepath)))
+    threads.append(threading.Thread(target=add_cols, args=(data, filepath)))
+    threads.append(threading.Thread(target=add_cols_and_rows, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_data_ints, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_data_values_with_delimiters, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_delimiters, args=(data, filepath)))
+    threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 50)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 0)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
+    threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
+    
+    for thread in threads:
+        thread.start()
+
+    print_line()
+    numthreads = (threading.active_count() - 1) # We subtract the main thread
+    workingThreads = 1
+
+    while workingThreads:
+        workingThreads = threading.active_count() - 1
+        progress_bar(numthreads - workingThreads, numthreads)
+        if crashed: 
+            return True
+
     return False
 
 '''
-Adds 1 - 10 New Rows
+Adds 1 - 100 New Rows
 '''
 def add_rows(data: list, filepath):
+    global crashed
     print("> Testing Adding Rows")
     d = copy.deepcopy(data)
     rowlen = len(d[0])
@@ -235,15 +286,17 @@ def add_rows(data: list, filepath):
 
         d.append(row)
 
+        if crashed: return
         if send_to_process(d, filepath):
-            return True
-
-    return False
+            crashed = True
+            return
+    print("- Finished Adding Rows")
 
 '''
-Adds 1 - 10 New Cols
+Adds 1 - 100 New Cols
 '''
 def add_cols(data: list, filepath):
+    global crashed
     print("> Testing Adding Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
@@ -251,15 +304,17 @@ def add_cols(data: list, filepath):
         for row in d:
             row.append(random.choice(string.ascii_letters))
 
+        if crashed: return
         if send_to_process(d, filepath):
-            return True
-
-    return False
+            crashed = True
+            return
+    print("- Finished Adding Cols")
 
 '''
 Adds both extra rows and columns at the same time
 '''
 def add_cols_and_rows(data: list, filepath):
+    global crashed
     print("> Testing Adding Rows and Columns")
     d = copy.deepcopy(data)
     for i in range(1, 101):
@@ -274,37 +329,45 @@ def add_cols_and_rows(data: list, filepath):
 
         d.append(newrow)
 
+        if crashed: return
         if send_to_process(d, filepath):
-            return True
-
-    return False
+            crashed = True
+            return
+    print("- Finished Adding Rows and Cols")
 
 '''
 Changes every cell in the CSV to all defined num values
 '''
 def mutate_data_ints(data: list, filepath):
+    global crashed
     print("> Testing Mutating Cell Values to Different Numbers")
     width = len(data[0])
     height = len(data)
 
     for i in range(0, height):
             for j in range (0, width):
-                with open('./src/wordlists/allnumber.txt', 'r') as file:
+                with open('./wordlists/allnumber.txt', 'r') as file:
                     for line in file:
                         d = copy.deepcopy(data)
                         
                         d[i][j] = line.strip()
                         
-                        if (send_to_process(d, filepath)):
+                        if crashed:
                             file.close()
-                            return True
+                            return
+                        if send_to_process(d, filepath):
+                            file.close()
+                            crashed = True
+                            return
                     file.close()
-    return False
+    print("- Finished Mutating Nums")
+    return
 
 '''
 Changes every cell in the CSV to all defined delimiter values
 '''
 def mutate_data_values_with_delimiters(data: list, filepath):
+    global crashed
     print("> Testing Mutating Cell Values to Different Delimiters")
     width = len(data[0])
     height = len(data)
@@ -316,26 +379,33 @@ def mutate_data_values_with_delimiters(data: list, filepath):
                     
                     d[i][j] = delim
 
+                    if crashed: return
                     if send_to_process(d, filepath):
-                        return True
-    return False
-
+                        crashed = True
+                        return
+    print("- Finished Mutatating with Delimiters")
+                    
 '''
 Mutates the delimiters for the CSV File
 '''
 def mutate_delimiters(data: list, filepath):
-    print("Mutating delimiters")
+    global crashed
+    print("> Mutating delimiters")
     for delim in delimiters_mutations_arr:
         d = copy.deepcopy(data)
         
-
+        if crashed: return
         if send_to_process_newdelim(d, filepath, delim):
-            return True
+            crashed = True
+            return
+    print("- Finished Changing Delimiters")
 
 '''
 Flips bits of the values contained within the CSV
 '''
 def flip_bits(data: list, filepath, numflips):
+    global crashed
+    print("> Flipping Bits")
     width = len(data[0])
     height = len(data)
 
@@ -356,48 +426,62 @@ def flip_bits(data: list, filepath, numflips):
                     d[i][j] = back_to_string
 
                     
+                    if crashed: return
                     if send_to_process(d, filepath):
-                        return True
-    return False
+                        crashed = True
+                        return
+    print("- Finished Flipping Bits")
 
 '''
 Mutates the strings within the CSV
 '''
 def mutate_strings(data: list, filepath):
+    global crashed
+    print("> Mutating Strings")
     width = len(data[0])
     height = len(data)
 
     for i in range(0, height):
             for j in range (0, width):
-                with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+                with open('./wordlists/naughtystrings.txt', 'r') as file:
                     for line in file:
                         d = copy.deepcopy(data)
                         
                         d[i][j] = line.strip()
                         
-                        if (send_to_process(d, filepath)):
+                        if crashed:
                             file.close()
-                            return True
+                            return
+                        if send_to_process(d, filepath):
+                            file.close()
+                            crashed = True
+                            return
                     file.close()
-    return False
+    print("- Finished Mutating Strings")
+    return
 
 '''
 Tries to add 1 - 1000 length strings in each index of the CSV
 '''
-def mutate_index(data: list, filepath):
-    print("Mutating indexes with string of len 0 - 100")
+def mutate_index(data: list, filepath, startNum):
+    global crashed
+    print(f"> Mutating indexes with string of len {startNum} - {startNum + 500}")
     width = len(data[0])
     height = len(data)
 
-    for i in range(0, height):
-            for j in range (0, width):
-                d = copy.deepcopy(data)
-                for x in range (0, 1000):
-                    
+    for x in range (startNum, startNum + 500):
+        for i in range(0, height):
+                for j in range (0, width):
+                    d = copy.deepcopy(data)
+                        
                     d[i][j] = 'A' * x
+
+                    if crashed: return
                     if send_to_process(d, filepath):
-                        return True
-    return False
+                        crashed = True
+                        return
+    print(f"- Finished Mutating indexes with string of len {startNum} - {startNum + 500}")
+    return
 
 '''
 Replaces a random value with another random value

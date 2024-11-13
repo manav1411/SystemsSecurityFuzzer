@@ -140,7 +140,7 @@ def fuzz_jpeg(filepath, words):
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
             print_crash_found()
-            exit()
+            return
 
     print_no_crash_found()
 

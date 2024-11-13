@@ -1,5 +1,8 @@
 import random
 
+'''
+Write the crash output to the file specified in the spec
+'''
 def write_crash_output(filename, input):
     output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
     with open(output_file, 'w') as file:
@@ -7,7 +10,12 @@ def write_crash_output(filename, input):
         file.close()
     print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
 
+'''
+Prints out the progress bar depending on input
+'''
 def progress_bar(current, total, bar_length=50):
+    if not total: return # divide by 0 check
+
     fraction = current / total
 
     arrow = int(fraction * bar_length - 1) * '-' + '>'
@@ -17,16 +25,37 @@ def progress_bar(current, total, bar_length=50):
 
     print(f'Progress: [{arrow}{padding}] {int(fraction*100)}%', end=ending)
 
+'''
+Prints some facts
+'''
+def print_some_facts(numpaths, timetaken):
+    print("Number of Unique Paths: " + str(numpaths) + " | Time Taken: " + str(timetaken) + " Seconds")
+
+'''
+Prints a line (duh)
+'''
+def print_line():
+    print("=" * 67)
+
+'''
+Prints that a crash has been found
+'''
 def print_crash_found():
     print("#" * 67)
     print("#" * 22 + " Crashable Input Found " + "#" * 22)
     print("#" * 67)
 
+'''
+Prints that no crash has been found
+'''
 def print_no_crash_found():
     print("#" * 67)
     print("#" * 20 + " No Crashable  Input Found " + "#" * 20)
     print("#" * 67)
 
+'''
+Prints that a new path has been found
+'''
 def print_new_path_found():
     print("# == # == # == # ==== # == # == # == #")
     print("# == # == # New Path Found # == # == #")

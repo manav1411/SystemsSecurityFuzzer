@@ -5,7 +5,6 @@ import random
 import subprocess
 import time
 from utils import *
-from math import pi
 
 '''
 Number of Total Mutations
@@ -90,7 +89,7 @@ def fuzz_plaintext(filepath, words):
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
             print_crash_found()
-            exit()
+            return
 
     print_no_crash_found()
 

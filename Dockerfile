@@ -1,13 +1,14 @@
 # Start from a default ubuntu image.
-FROM ubuntu:22.04
+FROM ubuntu
 FROM python:latest
 
+RUN apt-get update && apt-get install -y python3 python3-pip
+
 # Copy/Compile my fuzzer
-COPY fuzzer.py /
+COPY . /
 ADD binaries /binaries
 ADD example_inputs /example_inputs
-ADD src /src
 RUN chmod +x /binaries/*
 
 # Run it.
-CMD ["python3", "./fuzzer.py"]
+CMD ["python3", "fuzzer.py"]

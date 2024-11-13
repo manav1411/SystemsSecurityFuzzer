@@ -3,3 +3,4 @@ bad_*.txt
 __pycache__
 core
 .history/
+out
