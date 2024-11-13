@@ -10,7 +10,7 @@ import threading
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = True 
-SEE_OUTPUTS = True
+SEE_OUTPUTS = False
 MAX_THREADS = 5
 
 '''
@@ -91,8 +91,6 @@ Adds a given payloads threads to the queue
 '''
 def add_to_thread_queue(filepath, data):
     global threads
-    threads.append(threading.Thread(target=add_fields, args=(data, filepath)))
-    threads.append(threading.Thread(target=remove_fields, args=(data, filepath)))
     threads.append(threading.Thread(target=mutate_with_nums, args=(data, filepath)))
     threads.append(threading.Thread(target=mutate_with_strings, args=(data, filepath)))
     threads.append(threading.Thread(target=flip_bits_sequential, args=(data, filepath)))
@@ -100,6 +98,8 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=change_bytes_sequential, args=(data, filepath)))
     threads.append(threading.Thread(target=insert_bytes_random, args=(data, filepath)))
     threads.append(threading.Thread(target=swap_types, args=(data, filepath)))
+    threads.append(threading.Thread(target=add_fields, args=(data, filepath)))
+    threads.append(threading.Thread(target=remove_fields, args=(data, filepath)))
 
 '''
 Continously runs threads until the program crashes or there

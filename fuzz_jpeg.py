@@ -147,7 +147,7 @@ are no more processes to try and mutate
 '''
 def perform_mutation():
     global crashed, threads
-    while (len(threads)) > 0 and threading.active_count() > 1:
+    while (len(threads)) > 0 or threading.active_count() > 1:
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:

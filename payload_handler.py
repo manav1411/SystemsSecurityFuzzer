@@ -1,5 +1,6 @@
 import subprocess
 from utils import *
+import time
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
@@ -9,12 +10,19 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
         print(payload)
     
     try:
-        process = subprocess.run(
-            [filepath],
-            input=payload,
-            text=True,
-            capture_output=True
-        )
+        if isinstance(payload, bytes):
+            process = subprocess.run(
+                [filepath],
+                input=payload,
+                capture_output=True
+            )
+        else: 
+            process = subprocess.run(
+                [filepath],
+                input=payload,
+                text=True,
+                capture_output=True
+            )
         
         # Capture the return code and output
         code = process.returncode
@@ -35,38 +43,34 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
 '''
 Handles logging information when a binary does crash
 '''
-def handle_logging(payload, filepath, code, num_paths, time):
+def handle_logging(payload, filepath, code, num_paths, ptime):
     output_file = './logs/log_' + filepath[11:] + '.txt'
-    with open(output_file, 'w') as file:
-        if code != 0:
-            write_crash_output(filepath, payload)
+    if code != 0:
+        with open(output_file, 'w') as file:
             file.write(f'''
 Binary: {filepath[11:]}
 Program Exited with: {code} | {get_signal(code)}
 Number of Paths Found: {num_paths}
-Total Time Taken: {time}
-Crashing Payload: {payload}
-            ''')
+Total time Taken: {ptime}''')
+            file.close()
+        if isinstance(payload, bytes):
+            bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            with open(bad, 'wb') as badfile:
+                badfile.write(payload)
+                badfile.close()
         else:
+            bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            with open(bad, 'w') as badfile:
+                badfile.write(payload)
+                badfile.close()
+    else:
+        with open(output_file, 'w') as file:
             file.write(f'''
 Binary: {filepath[11:]}
-Program Exited with: "Normal Exit (No Crash)"
+Program Exited with: Normal Exit (No Crash)
 Number of Paths Found: {num_paths}
-Total Time Taken: {time}
-            ''')
-        file.close()
-
-'''
-Write the crash output to the file specified in the spec
-'''
-def write_crash_output(filepath, payload):
-    output_file = './fuzzer_output/bad_' + filepath[11:] + '.txt'
-    with open(output_file, 'w') as file:
-        file.write(payload)
-        file.close()
-    print(f"Writing Input: ( {payload} ) to Output File : ( {output_file} )")
-
-
+Total time Taken: {ptime}''')
+            file.close()
 '''
 Returns a string about which signal was received that wasnt 0
 '''
@@ -91,8 +95,13 @@ def get_signal(code):
 Checks whether a string match occurs within the first n chars to scan for duplicate outputs
 '''
 def check_start_output(o, paths):
-    length = 10 if len(o) > 10 else len(0) / 2
+    if len(o) == 0: return False
+    length = 10 if len(o) > 10 else len(o) / 2
     for path in paths:
-        if o[:length] in path:
-            return True
+        if isinstance(o, bytes):
+            if o[:length] in path:
+                return True
+        else:
+            if o[:length].encode() in path:
+                return True
     return False

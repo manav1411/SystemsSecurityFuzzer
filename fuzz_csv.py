@@ -5,14 +5,8 @@ import random
 import string
 import time
 import threading
-from math import pi
 from utils import *
 from payload_handler import *
-
-'''
-Number of Total Mutations
-'''
-NUM_MUTATIONS = 100
 
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
@@ -99,8 +93,8 @@ def list_to_csv(data, delimiter=','):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    payload = list_to_csv(payload, ',')
-    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+    p = list_to_csv(payload, ',')
+    _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
     global crashed
     crashed = _crashed
@@ -108,7 +102,7 @@ def send_to_process(payload, filepath):
     # Handles the program logging if it crashes
     if crashed:
         global start
-        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
+        handle_logging(p, filepath, _code, len(found_paths), time.time() - start)
         return True
 
     # If a new output is found it is added to the queue
@@ -120,8 +114,8 @@ def send_to_process(payload, filepath):
 
 ''' New Delim Version '''
 def send_to_process_newdelim(payload, filepath, delim):
-    payload = list_to_csv(payload, delim)
-    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+    p = list_to_csv(payload, delim)
+    _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
     global crashed
     crashed = _crashed
@@ -129,7 +123,7 @@ def send_to_process_newdelim(payload, filepath, delim):
     # Handles the program logging if it crashes
     if crashed:
         global start
-        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
+        handle_logging(p, filepath, _code, len(found_paths), time.time() - start)
         return True
 
     # If a new output is found it is added to the queue
@@ -145,9 +139,9 @@ Main function call to begin fuzzing CSV input binaries
 def fuzz_csv(filepath, words):
     global start
     start = time.time()
-    words = csv_to_list(words)
+    w = csv_to_list(words)
 
-    send_to_process(words, filepath)
+    send_to_process(w, filepath)
 
     if perform_mutation():
         print_crash_found()
@@ -178,7 +172,7 @@ are no more processes to try and mutate
 '''
 def perform_mutation():
     global crashed, threads
-    while (len(threads)) > 0 and threading.active_count() > 1:
+    while (len(threads)) > 0 or threading.active_count() > 1:
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:

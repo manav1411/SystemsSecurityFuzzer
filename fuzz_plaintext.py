@@ -41,20 +41,20 @@ threads = []
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
-    
+    pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+
     global crashed
-    crashed = _crashed
+    crashed = pcrashed
 
     # Handles the program logging if it crashes
     if crashed:
         global start
-        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
+        handle_logging(payload, filepath, pcode, len(found_paths), time.time() - start)
         return True
 
     # If a new output is found it is added to the queue
-    if _output not in found_paths:
-        found_paths.append(_output)
+    if poutput not in found_paths and not check_start_output(poutput, found_paths):
+        found_paths.append(poutput)
         add_to_thread_queue(filepath, payload)
 
     return False
@@ -67,11 +67,11 @@ def fuzz_plaintext(filepath, words):
     start = time.time()
 
     send_to_process(words, filepath)
-
+    
     if perform_mutation():
         print_crash_found()
         return
-
+    
     handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
@@ -98,7 +98,7 @@ are no more processes to try and mutate
 '''
 def perform_mutation():
     global crashed, threads
-    while (len(threads)) > 0 and threading.active_count() > 1:
+    while (len(threads)) > 0 or threading.active_count() > 1:
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:
@@ -166,8 +166,8 @@ Inserts random bytes into the original payload
 def add_random_bytes(filepath, data, start):
     global crashed
     print("> Adding in random bytes")
-    for _ in range(start, start + 500): # TODO: Increased this because it crashes plaintext3 sometimes
-        for num in range(1, 11):
+    for _ in range(start, start + 50): # TODO: Increased this because it crashes plaintext3 sometimes
+        for num in range(1, 51):
             d = copy.deepcopy(data)
             with_random = uadd_random_bytes(d, num)
             if crashed: return
