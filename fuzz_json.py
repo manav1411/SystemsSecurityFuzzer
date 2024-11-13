@@ -1,6 +1,7 @@
 import json
 import copy
 import time
+import signal
 from utils import *
 import subprocess
 import threading
@@ -8,7 +9,7 @@ import threading
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = True 
+SEE_INPUTS = False 
 PRINT_OUTPUTS = False
 
 '''
@@ -95,7 +96,7 @@ def send_to_process(payload, filepath):
         write_crash_output(filepath, json.dumps(payload))
         progress_bar(1, 1)
         print_crash_found()
-        print_some_facts(len(found_paths), end - start)
+        print_some_facts(len(found_paths), end - start, get_signal(code))
         return True
     else:
         return False
@@ -111,8 +112,6 @@ def fuzz_json(filepath, words):
     send_to_process(words, filepath)
 
     for item in queue:
-        global threads
-        threads = []
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
             return
@@ -131,8 +130,9 @@ def perform_mutation(filepath, data: json):
     threads.append(threading.Thread(target=flip_bits, args=(data, filepath)))
     threads.append(threading.Thread(target=swap_types, args=(data, filepath)))
     
-    for thread in threads:
-        thread.start()
+    while len(threads) > 0:
+        t = threads.pop()
+        t.start()
 
     print_line()
     numthreads = (threading.active_count() - 1) # We subtract the main thread

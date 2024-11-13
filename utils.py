@@ -1,4 +1,5 @@
 import random
+import signal
 
 '''
 Write the crash output to the file specified in the spec
@@ -26,10 +27,31 @@ def progress_bar(current, total, bar_length=50):
     print(f'Progress: [{arrow}{padding}] {int(fraction*100)}%', end=ending)
 
 '''
+Returns a string about which signal was received that wasnt 0
+'''
+def get_signal(code):
+    if code == signal.SIGABRT: return "SIGABRT - abort() Call"
+    elif code == signal.SIGALRM: return "SIGALRM - alarm() Call"
+    elif code == signal.SIGBUS: return "SIGBUS - Bus Error (Bad Memory Access)"
+    elif code == signal.SIGCHLD: return "SIGCHLD - Child Process Terminated"
+    elif code == signal.SIGFPE: return "SIGFPE - Floating Point Exception"
+    elif code == signal.SIGHUP: return "SIGHUP - Hangup Detected on Controlling Terminal or Death of Controlling Process"
+    elif code == signal.SIGILL: return "SIGILL - Illegal Instruction"
+    elif code == signal.SIGINT: return "SIGINT - Interrupt from Keyboard (CTRL + C)"
+    elif code == signal.SIGKILL: return "SIGKILL - Kill Signal"
+    elif code == signal.SIGPIPE: return "SIGPIPE - Broken Pipe"
+    elif code == signal.SIGSEGV: return "SIGSEGV - Segfault Detected (Invalid Memory Reference.)"
+    elif code == signal.SIGTERM: return "SIGTERM - Termination Signal"
+    elif code == signal.SIGUSR1: return "SIGUSR1 - User Defined Signal (Unknown)"
+    elif code == signal.SIGUSR2: return "SIGUSR2 - User Defined Signal (Unknown)"
+    else: return "Unknown Signal Received"
+
+'''
 Prints some facts
 '''
-def print_some_facts(numpaths, timetaken):
+def print_some_facts(numpaths, timetaken, signal="None"):
     print("Number of Unique Paths: " + str(numpaths) + " | Time Taken: " + str(timetaken) + " Seconds")
+    print("Signal Received: ")
 
 '''
 Prints a line (duh)

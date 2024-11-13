@@ -119,7 +119,6 @@ def send_to_process(payload, filepath):
             # Adds the output so we don't encounter it again and keep appending 
             found_paths.append(output)
             print_new_path_found()
-            time.sleep(1)
 
     if code != 0:
         write_crash_output(filepath, str(payload))

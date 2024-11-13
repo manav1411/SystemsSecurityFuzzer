@@ -1,4 +1,4 @@
-import main
+import fuzz_main
 from utils import print_line
 import sys
 import threading
@@ -14,7 +14,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         print(f"Fuzzing: {sys.argv[1]}")
         print_line()
-        main.fuzz(sys.argv[1], sys.argv[2])
+        fuzz_main.fuzz(sys.argv[1], sys.argv[2])
 
     elif len(sys.argv) != 3:
         print("No arguments given. Fuzzing all Binaries")
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
         for i in range(0, len(binaries)):
             # main.fuzz(binaries[i], binaries[i] + ".txt")
-            programs.append(multiprocessing.Process(target=main.fuzz, args=(binaries[i], binaries[i] + ".txt")))
+            programs.append(multiprocessing.Process(target=fuzz_main.fuzz, args=(binaries[i], binaries[i] + ".txt")))
 
         while len(programs) > 0:
             if len(multiprocessing.active_children()) >= MAX_CORES:

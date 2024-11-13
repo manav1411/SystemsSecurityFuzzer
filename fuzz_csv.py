@@ -160,7 +160,7 @@ def send_to_process(csv_payload, filepath):
         write_crash_output(filepath, payload)
         progress_bar(1, 1)
         print_crash_found()
-        print_some_facts(len(found_paths), end - start)
+        print_some_facts(len(found_paths), end - start, get_signal(code))
         return True
     else:
         return False
@@ -215,7 +215,7 @@ def send_to_process_newdelim(csv_payload, filepath, delimiter):
         write_crash_output(filepath, payload)
         progress_bar(1, 1)
         print_crash_found()
-        print_some_facts(len(found_paths), end - start)
+        print_some_facts(len(found_paths), end - start, get_signal(code))
         return True
     else:
         return False
@@ -232,8 +232,6 @@ def fuzz_csv(filepath, words):
     send_to_process(words, filepath)
 
     for item in queue:
-        global threads
-        threads = []
         d = copy.deepcopy(item)
         if perform_mutation(filepath, d):
             return
@@ -255,8 +253,9 @@ def perform_mutation(filepath, data):
     threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
     
-    for thread in threads:
-        thread.start()
+    while len(threads) > 0:
+        t = threads.pop()
+        t.start()
 
     print_line()
     numthreads = (threading.active_count() - 1) # We subtract the main thread
