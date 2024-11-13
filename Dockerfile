@@ -1,6 +1,5 @@
 # Start from a default ubuntu image.
-FROM ubuntu
-FROM python:latest
+FROM --platform=linux/amd64 ubuntu:latest
 
 RUN apt-get update && apt-get install -y python3 python3-pip
 

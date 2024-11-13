@@ -2,8 +2,13 @@ import main
 from utils import print_line
 import sys
 import threading
+import multiprocessing
 from os import listdir
 from os.path import isfile, join
+
+programs = []
+
+MAX_CORES = 4
 
 if __name__ == "__main__":
     if len(sys.argv) == 3:
@@ -19,7 +24,11 @@ if __name__ == "__main__":
         binaries = [f for f in listdir("./binaries") if isfile(join("./binaries", f))]
 
         for i in range(0, len(binaries)):
-            main.fuzz(binaries[i], binaries[i] + ".txt")
-            #t = threading.Thread(target=main.fuzz, args=(binaries[i], binaries[i] + ".txt"))
-            #t.start()
-            
+            # main.fuzz(binaries[i], binaries[i] + ".txt")
+            programs.append(multiprocessing.Process(target=main.fuzz, args=(binaries[i], binaries[i] + ".txt")))
+
+        while len(programs) > 0:
+            if len(multiprocessing.active_children()) >= MAX_CORES:
+                continue
+            run = programs.pop()
+            run.start()
