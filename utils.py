@@ -2,16 +2,6 @@ import random
 import signal
 
 '''
-Write the crash output to the file specified in the spec
-'''
-def write_crash_output(filename, input):
-    output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
-    with open(output_file, 'w') as file:
-        file.write(input)
-        file.close()
-    print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
-
-'''
 Prints out the progress bar depending on input
 '''
 def progress_bar(current, total, bar_length=50):
@@ -25,26 +15,6 @@ def progress_bar(current, total, bar_length=50):
     ending = '\n' if current == total else '\r'
 
     print(f'Progress: [{arrow}{padding}] {int(fraction*100)}%', end=ending)
-
-'''
-Returns a string about which signal was received that wasnt 0
-'''
-def get_signal(code):
-    if code == signal.SIGABRT: return "SIGABRT - abort() Call"
-    elif code == signal.SIGALRM: return "SIGALRM - alarm() Call"
-    elif code == signal.SIGBUS: return "SIGBUS - Bus Error (Bad Memory Access)"
-    elif code == signal.SIGCHLD: return "SIGCHLD - Child Process Terminated"
-    elif code == signal.SIGFPE: return "SIGFPE - Floating Point Exception"
-    elif code == signal.SIGHUP: return "SIGHUP - Hangup Detected on Controlling Terminal or Death of Controlling Process"
-    elif code == signal.SIGILL: return "SIGILL - Illegal Instruction"
-    elif code == signal.SIGINT: return "SIGINT - Interrupt from Keyboard (CTRL + C)"
-    elif code == signal.SIGKILL: return "SIGKILL - Kill Signal"
-    elif code == signal.SIGPIPE: return "SIGPIPE - Broken Pipe"
-    elif code == signal.SIGSEGV: return "SIGSEGV - Segfault Detected (Invalid Memory Reference.)"
-    elif code == signal.SIGTERM: return "SIGTERM - Termination Signal"
-    elif code == signal.SIGUSR1: return "SIGUSR1 - User Defined Signal (Unknown)"
-    elif code == signal.SIGUSR2: return "SIGUSR2 - User Defined Signal (Unknown)"
-    else: return "Unknown Signal Received"
 
 '''
 Prints some facts
@@ -99,18 +69,21 @@ def is_str(data):
 '''
 Flips some random bits within some bits
 '''
-def uflip_bits(bits, flip_prob=0.2):
-    # Convert the bit string into a list of characters
+def uflip_bits_random(bits, flip_prob=0.2):
     bit_list = list(bits)
-
-    # Iterate through the bit list and randomly flip bits
     for i in range(len(bit_list)):
         if random.random() < flip_prob:
-            # Flip the bit (0 becomes 1, and 1 becomes 0)
             bit_list[i] = '1' if bit_list[i] == '0' else '0'
 
-    # Join the list back into a string and return the result
     return ''.join(bit_list)
+
+'''
+Flips a bit at a position
+'''
+def uflip_bits_at(bits, index):
+    bit_list = list(bits)
+    flipped_bit = '1' if bit_list[index] == '0' else '0'
+    return bit_list[:index] + flipped_bit + bit_list[index + 1:]
 
 '''
 Converts a string to bits
@@ -127,7 +100,7 @@ def ubits_to_string(bits):
 '''
 Converts a number to bits
 '''
-def unumber_to_bits(number, bit_length=None):
+def unumber_to_bits(number, bit_length=64):
     # Convert the number to binary and remove the '0b' prefix
     binary_representation = bin(number)[2:]
     
@@ -142,3 +115,26 @@ Converts bits back to a number
 '''
 def ubits_to_number(bits):
      return int(bits, 2)
+
+'''
+Changes a byte at a given index to a specified byte
+'''
+def replace_byte_at(data, index, byte):
+    # Convert byte to a string if it's an integer, and validate it
+    if isinstance(byte, int):
+        byte = chr(byte)
+    elif not isinstance(byte, str) or len(byte) != 1:
+        return ""
+    
+    # Convert data to a string if it is an integer
+    if isinstance(data, int):
+        data = str(data)
+    
+    # Perform the replacement
+    new_data = data[:index] + byte + data[index + 1:]
+    
+    # Convert back to integer if the original data was an integer
+    if isinstance(data, int):
+        return int(new_data)
+    
+    return new_data

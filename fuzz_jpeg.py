@@ -1,18 +1,15 @@
 import copy
-import subprocess
 import time
+import threading
 from utils import *
-
-'''
-Number of Total Mutations
-'''
-NUM_MUTATIONS = 100
+from payload_handler import *
 
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
-PRINT_OUTPUTS = False
+SEE_OUTPUTS = False
+MAX_THREADS = 5
 
 '''
 File Structure Bytes of JPEG File - Don't know how important these are in fuzzing
@@ -40,7 +37,6 @@ NO_BYTES = b''
 JPEG_1 = b'\xFF\xD8\xFF\xDB'
 JPEG_2 = b'\xFF\xD8\xFF\xEE'
 JPEG_JFIF = b'\xFF\xD8\xFF\xE0\x00\x10\x4A\x46\x49\x46\x00\x01'
-JPEG_EXIF = b'\xFF\xD8\xFF\xE1????\x45\x78\x69\x66\x00\x00' # Not sure what this one is meant to be or if it is meant to include the ????
 BITMAP = b'\x42\x4d'
 FITS = b'\x53\x49\x4d\x50\x4c\x45'
 GIF = b'\x47\x49\x46\x38'
@@ -66,13 +62,26 @@ MS_DOS = b'\x4d\x5a'
 ELF = b'\x7f\x45\x4c\x46'
 
 magic_bytes_arr = [
-    NO_BYTES, JPEG_1, JPEG_2, JPEG_JFIF, JPEG_EXIF, BITMAP, FITS, GIF, GKSM,
+    NO_BYTES, JPEG_1, JPEG_2, JPEG_JFIF, BITMAP, FITS, GIF, GKSM,
     IRIS, ITC, NIFF, PM, PNG, POSTSCRIPT, SUN_RASTER, TIFF_MOT, TIFF_INT, XCF,
     XFIG, XPM, BZIP, COMPRESS, GZIP, PKZIP, TAR_POSIX, MS_DOS, ELF
 ]
 
-queue = []
+'''
+For code coverage
+'''
 found_paths = []
+
+'''
+Timing Things
+'''
+start = 0
+
+'''
+Threads for multithreading
+'''
+crashed = False
+threads = []
 
 '''
 Returns whether the given data is valid JPEG or not
@@ -85,160 +94,159 @@ def is_jpeg(words):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    if SEE_INPUTS:
-        print(payload)
-        
-    try:
-        process = subprocess.run(
-            [filepath],
-            input=payload,
-            text=True,
-            capture_output=True
-        )
-        
-        # Capture the return code and output
-        code = process.returncode
-        output = process.stdout
-
-        if PRINT_OUTPUTS:
-            print(output)
-        
-    except Exception as e:
-        print(e)
-        return False
+    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    if output == "":
-        pass
-    # A different traversal path has been found and hence it is added to the queue
-    elif output not in found_paths:
-        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-        if not ("invalid" in output or "Invalid" in output):
-            # Add the current payload into the queue
-            queue.append(payload)
+    global crashed
+    crashed = _crashed
 
-            # Adds the output so we don't encounter it again and keep appending 
-            found_paths.append(output)
-            print_new_path_found()
-
-    if code != 0:
-        write_crash_output(filepath, str(payload))
+    # Handles the program logging if it crashes
+    if crashed:
+        global start
+        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
         return True
-    else:
-        return False
+
+    # If a new output is found it is added to the queue
+    if _output not in found_paths:
+        found_paths.append(_output)
+        add_to_thread_queue(filepath, payload)
+
+    return False
 
 '''
 Main function call to begin fuzzing JSON input binaries
 '''
 def fuzz_jpeg(filepath, words):
-    queue.append(words)
+    global start
+    start = time.time()
 
-    # Do the first default payload to see what the intial output should be.
     send_to_process(words, filepath)
 
-    for item in queue:
-        d = copy.deepcopy(item)
-        if perform_mutation(filepath, d):
-            print_crash_found()
-            return
+    if perform_mutation():
+        print_crash_found()
+        return
 
+    handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
 '''
-Begins the mutation process
+Adds a given payloads threads to the queue
 '''
-def perform_mutation(filepath, data):
-    if send_to_process('', filepath): return True
-    if swap_jpeg_bytes(filepath, data): return True
-    if remove_jpeg_bytes(filepath, data): return True
-    if change_magic_bytes(filepath, data): return True
-    if change_start_end_bytes(filepath, data): return True
-    if remove_random_bytes(filepath, data): return True
-    if insert_random_bytes(filepath, data): return True
-    if reverse_bytes(filepath, data): return True
+def add_to_thread_queue(filepath, data):
+    global threads
+    threads.append(threading.Thread(target=swap_jpeg_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=remove_jpeg_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=change_magic_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=change_start_end_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=remove_random_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=insert_random_bytes, args=(filepath, data)))
+    threads.append(threading.Thread(target=reverse_bytes, args=(filepath, data)))
+
+'''
+Continously runs threads until the program crashes or there
+are no more processes to try and mutate
+'''
+def perform_mutation():
+    global crashed, threads
+    while (len(threads)) > 0 and threading.active_count() > 1:
+        if crashed: 
+            return True
+        elif threading.active_count() >= MAX_THREADS:
+            continue
+        elif len(threads) != 0:
+            t = threads.pop()
+            t.start()
+
     return False
 
 '''
 Replaces special bytes with other special bytes
 '''
 def swap_jpeg_bytes(filepath, data):
-    print("Swapping JPEG Bytes to Other Forms")
+    global crashed
     for original in file_struct_arr:
         for replacement in file_struct_arr:
             if (original is not replacement):
                 newdata = data.replace(original, replacement)
 
+                if crashed: return
                 if send_to_process(newdata, filepath):
-                    return True
-    return False
+                    crashed = True
+                    return
 
 '''
 Removes special bytes from the text
 '''
 def remove_jpeg_bytes(filepath, data):
-    print("Removing JPEG Bytes")
+    global crashed
     for original in file_struct_arr:
         newdata = data.replace(original, b"")
 
+        if crashed: return
         if send_to_process(newdata, filepath):
-            return True
-    return False
+            crashed = True
+            return
 
 '''
 Replaces the JPEG magic bytes with other formats
 '''
 def change_magic_bytes(filepath, data):
-    print("Changing Magic Bytes")
+    global crashed
     for magic in magic_bytes_arr:
         newdata = magic + data[12:]
-        if send_to_process( newdata, filepath):
-            return True
-    return False
+        if crashed: return
+        if send_to_process(newdata, filepath):
+            crashed = True
+            return
 
 '''
 Changes the position of both start and end structure bytes
 '''
 def change_start_end_bytes(filepath, data):
-    print("Swapping Start and End Bytes")
+    global crashed
     newdata = data.replace(END_IMAGE, START_IMAGE)
     newdata = newdata.replace(START_IMAGE, END_IMAGE, 1) # only replaces the first instance
 
+    if crashed: return
     if send_to_process(newdata, filepath):
-            return True
-    return False
+        crashed = True
+        return
 
 
 '''
 Remove random bytes
 '''
 def remove_random_bytes(filepath, data):
-    print("Removing Random Bytes")
+    global crashed
     for i in range(0, 100):
         newdata = remove_random_bytes_util(data, i)
 
+        if crashed: return
         if send_to_process(newdata, filepath):
-            return True
-    return False
+            crashed = True
+            return
 
 '''
 Insert random bytes
 '''
 def insert_random_bytes(filepath, data):
-    print("Inserting Random Bytes")
+    global crashed
     for i in range(0, 100):
         newdata = insert_random_bytes_util(data, i)
 
+        if crashed: return
         if send_to_process(newdata, filepath):
-            return True
-    return False
+            crashed = True
+            return
 
 '''
 Reverses the entire payload cause why not
 '''
 def reverse_bytes(filepath, data):
-    print("Reversing the Entire Thing")
+    global crashed
+    if crashed: return
     if send_to_process(data[::-1], filepath):
-            return True
-    return False
+        crashed = True
+        return
 
 '''
 Helper

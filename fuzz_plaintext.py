@@ -6,17 +6,14 @@ import subprocess
 import time
 import threading
 from utils import *
-
-'''
-Number of Total Mutations
-'''
-NUM_MUTATIONS = 100
+from payload_handler import *
 
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
-PRINT_OUTPUTS = False
+SEE_OUTPUTS = False
+MAX_THREADS = 5
 
 format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
 ascii_controls = ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08',
@@ -25,16 +22,14 @@ ascii_controls = ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07'
                   '\x1b', '\x1c', '\x1d', '\x1e', '\x1f', '\x20', '\x7f']
 
 '''
-Queueing for code coverage
+For code coverage
 '''
-queue = []
 found_paths = []
 
 '''
 Timing Things
 '''
 start = 0
-end = 0
 
 '''
 Threads for multithreading
@@ -46,52 +41,23 @@ threads = []
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    if SEE_INPUTS:
-        print(payload)
+    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    try:
-        process = subprocess.run(
-            [filepath],
-            input=payload,
-            text=True,
-            capture_output=True
-        )
-        
-        # Capture the return code and output
-        code = process.returncode
-        output = process.stdout
+    global crashed
+    crashed = _crashed
 
-        if PRINT_OUTPUTS:
-            print(output)
-        
-    except Exception as e:
-        print(e)
-        return False
-    
-    if output == "":
-        pass
-    # A different traversal path has been found and hence it is added to the queue
-    elif output not in found_paths:
-        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-        if not ("invalid" in output or "Invalid" in output):
-            # Add the current payload into the queue
-            queue.append(payload)
-
-            # Adds the output so we don't encounter it again and keep appending 
-            found_paths.append(output)
-            print_new_path_found()
-    
-    if code != 0:
-        global crashed
-        crashed = True
-        end = time.time()
-        write_crash_output(filepath, payload)
-        progress_bar(1, 1)
-        print_crash_found()
-        print_some_facts(len(found_paths), end - start, get_signal(code))
+    # Handles the program logging if it crashes
+    if crashed:
+        global start
+        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
         return True
-    else:
-        return False
+
+    # If a new output is found it is added to the queue
+    if _output not in found_paths:
+        found_paths.append(_output)
+        add_to_thread_queue(filepath, payload)
+
+    return False
 
 '''
 Main function call to begin fuzzing Plaintext input binaries
@@ -99,25 +65,21 @@ Main function call to begin fuzzing Plaintext input binaries
 def fuzz_plaintext(filepath, words):
     global start
     start = time.time()
-    queue.append(words)
 
-    # Do the first default payload to see what the intial output should be.
-    send_to_process(str(words), filepath)
+    send_to_process(words, filepath)
 
-    for item in queue:
-        global threads
-        threads = []
-        d = copy.deepcopy(item)
-        if perform_mutation(filepath, d):
-            return
+    if perform_mutation():
+        print_crash_found()
+        return
 
+    handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
 '''
-Begins the mutation process
+Adds a given payloads threads to the queue
 '''
-def perform_mutation(filepath, data):
-    global crashed
+def add_to_thread_queue(filepath, data):
+    global threads
     threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
     threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
     threads.append(threading.Thread(target=flip_bits, args=(filepath, data)))
@@ -129,20 +91,22 @@ def perform_mutation(filepath, data):
     threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 500)))
     threads.append(threading.Thread(target=send_massive, args=(filepath, )))
     threads.append(threading.Thread(target=send_format_strings, args=(filepath, )))
-    
-    while len(threads) > 0:
-        t = threads.pop()
-        t.start()
 
-    print_line()
-    numthreads = (threading.active_count() - 1) # We subtract the main thread
-    workingThreads = 1
-
-    while workingThreads:
-        workingThreads = threading.active_count() - 1
-        progress_bar(numthreads - workingThreads, numthreads)
+'''
+Continously runs threads until the program crashes or there
+are no more processes to try and mutate
+'''
+def perform_mutation():
+    global crashed, threads
+    while (len(threads)) > 0 and threading.active_count() > 1:
         if crashed: 
             return True
+        elif threading.active_count() >= MAX_THREADS:
+            continue
+        elif len(threads) != 0:
+            t = threads.pop()
+            t.start()
+
     return False
     
 '''
@@ -189,7 +153,7 @@ def flip_bits(filepath, data):
     print("> Flipping bits")
     for num in range(0, len(data) * 50):
         d = copy.deepcopy(data)
-        flipped = uflip_bits(ustring_to_bits(str(d)))
+        flipped = uflip_bits_random(ustring_to_bits(str(d)))
         if crashed: return
         if send_to_process(ubits_to_string(flipped), filepath):
             crashed = True

@@ -1,16 +1,17 @@
 import json
 import copy
 import time
-import signal
 from utils import *
-import subprocess
+from payload_handler import *
+from random import randbytes, randint
 import threading
 
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False 
-PRINT_OUTPUTS = False
+SEE_OUTPUTS = False
+MAX_THREADS = 5
 
 '''
 Mutations defines
@@ -19,16 +20,14 @@ arr_of_types = ["A" * 400, -1389054671389658013709571389065891365890189164, json
 type_swaps_arr = ["A" * 2000, -9999999999999999999999999999999999999999999999999999999999999999999, json.loads('{"Name": "Jennifer Smith","Contact Number": 7867567898,"Email": "jen123@gmail.com","Hobbies":["Reading", "Sketching", "Horse Riding"]}'), arr_of_types, None, True, False]
 
 '''
-Queueing for code coverage
+For code coverage
 '''
-queue = []
 found_paths = []
 
 '''
 Timing Things
 '''
 start = 0
-end = 0
 
 '''
 Threads for multithreading
@@ -52,54 +51,23 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(payload, filepath):
     payload = json.dumps(payload)
-    if SEE_INPUTS:
-        print(payload)
+    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    try:
-        process = subprocess.run(
-            [filepath],
-            input=payload,
-            text=True,
-            capture_output=True
-        )
-        
-        # Capture the return code and output
-        code = process.returncode
-        output = process.stdout
+    global crashed
+    crashed = _crashed
 
-        if PRINT_OUTPUTS:
-            print(output)
-        
-    except Exception as e:
-        print(e)
-        return False
-    
-    if output == "":
-        pass
-    # A different traversal path has been found and hence it is added to the queue
-    elif output not in found_paths:
-        # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
-        if not ("invalid" in output or "Invalid" in output):
-            print(" >> New Path Found, Adding to Queue")
-            print(payload)
-            
-            # Add the current payload into the queue
-            queue.append(json.loads(payload))
-
-            # Adds the output so we don't encounter it again and keep appending 
-            found_paths.append(output)
-    
-    if code != 0:
-        global crashed
-        crashed = True
-        end = time.time()
-        write_crash_output(filepath, json.dumps(payload))
-        progress_bar(1, 1)
-        print_crash_found()
-        print_some_facts(len(found_paths), end - start, get_signal(code))
+    # Handles the program logging if it crashes
+    if crashed:
+        global start
+        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
         return True
-    else:
-        return False
+
+    # If a new output is found it is added to the queue
+    if _output not in found_paths:
+        found_paths.append(_output)
+        add_to_thread_queue(filepath, payload)
+
+    return False
 
 '''
 Main function call to begin fuzzing JSON input binaries
@@ -111,64 +79,66 @@ def fuzz_json(filepath, words):
 
     send_to_process(words, filepath)
 
-    for item in queue:
-        d = copy.deepcopy(item)
-        if perform_mutation(filepath, d):
-            return
+    if perform_mutation():
+        print_crash_found()
+        return
 
+    handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
 '''
-Begins the mutation process
+Adds a given payloads threads to the queue
 '''
-def perform_mutation(filepath, data: json):
-    global crashed
+def add_to_thread_queue(filepath, data):
+    global threads
     threads.append(threading.Thread(target=add_fields, args=(data, filepath)))
     threads.append(threading.Thread(target=remove_fields, args=(data, filepath)))
-    threads.append(threading.Thread(target=mutate_nums, args=(data, filepath)))
-    threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
-    threads.append(threading.Thread(target=flip_bits, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_with_nums, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_with_strings, args=(data, filepath)))
+    threads.append(threading.Thread(target=flip_bits_sequential, args=(data, filepath)))
+    threads.append(threading.Thread(target=flip_bits_random, args=(data, filepath)))
+    threads.append(threading.Thread(target=change_bytes_sequential, args=(data, filepath)))
+    threads.append(threading.Thread(target=insert_bytes_random, args=(data, filepath)))
     threads.append(threading.Thread(target=swap_types, args=(data, filepath)))
-    
-    while len(threads) > 0:
-        t = threads.pop()
-        t.start()
 
-    print_line()
-    numthreads = (threading.active_count() - 1) # We subtract the main thread
-    workingThreads = 1
-
-    while workingThreads:
-        workingThreads = threading.active_count() - 1
-        progress_bar(numthreads - workingThreads, numthreads)
+'''
+Continously runs threads until the program crashes or there
+are no more processes to try and mutate
+'''
+def perform_mutation():
+    global crashed, threads
+    while (len(threads)) > 0 and threading.active_count() > 1:
         if crashed: 
             return True
+        elif threading.active_count() >= MAX_THREADS:
+            continue
+        elif len(threads) != 0:
+            t = threads.pop()
+            t.start()
+
     return False
 
 '''
-Adds 1 - 1000 New Fields
+Adds Fields to the JSON
 '''
 def add_fields(data: json, filepath):
     global crashed
-    print("> Testing Adding Fields")
     for i in range(1,1001):
         d = copy.deepcopy(data)
 
         for j in range (0, i):
             d[f"RandomField{j}"] = f"RandomValue{j}"
-        
+
         if crashed: return
         if send_to_process(d, filepath):
             crashed = True
             return
-    print("- Finished Adding Fields")
-        
+
 '''
-Removes each of the top level JSON fields
+Removes Fields to the JSON
 '''
 def remove_fields(data: json, filepath):
     global crashed
-    print("> Testing Removing Fields")
     keys = data.keys()  
     for keyValue in keys:
         d = copy.deepcopy(data)
@@ -177,20 +147,14 @@ def remove_fields(data: json, filepath):
         if send_to_process(d, filepath):
             crashed = True
             return
-    print("- Finished Removing Fields")
 
 '''
-Mutates number fields within the JSON to different values
+Mutates fields within the JSON to different number values
 '''
-def mutate_nums(data: json, filepath):
-    print("> Mutating Number Fields")
+def mutate_with_nums(data: json, filepath):
     global crashed
     keys = data.keys()
-
     for keyValue in keys:
-        if not is_num(data[keyValue]):
-            continue
-
         with open('./wordlists/allnumber.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
@@ -205,20 +169,14 @@ def mutate_nums(data: json, filepath):
                     crashed = True
                     return
             file.close()
-    print("- Mutating Numbers")
 
 '''
-Mutates string fields within the JSON to different values
+Mutates fields within the JSON to different number values
 '''
-def mutate_strings(data: json, filepath):
+def mutate_with_strings(data: json, filepath):
     global crashed
-    print("> Mutating String Fields")
     keys = data.keys()
-
     for keyValue in keys:
-        if not is_str(data[keyValue]):
-            continue
-
         with open('./wordlists/naughtystrings.txt', 'r') as file:
             for line in file:
                 d = copy.deepcopy(data)
@@ -232,37 +190,130 @@ def mutate_strings(data: json, filepath):
                     crashed = True
                     return
             file.close()
-    print("- Finished Mutating Strings")
 
 '''
-Mutates fields with the bits randomly flipped
+Sequentially flips bits one at a time
 '''
-def flip_bits(data: json, filepath):
+def flip_bits_sequential(data: json, filepath):
     global crashed
-    print("> Flipping Bits")
     keys = data.keys()
-
     for keyValue in keys:
-        for i in range(0, 100):
+        length = 0
+        if is_num(data[keyValue]):
+            bits = unumber_to_bits(data[keyValue])
+            length = len(bits)
+        elif is_str(data[keyValue]):
+            bits = ustring_to_bits(data[keyValue])
+            length = len(bits)
+        for i in range(0, length):
             d = copy.deepcopy(data)
 
-            if is_num(d[keyValue]):
-                d[keyValue] = ubits_to_number(uflip_bits(unumber_to_bits(d[keyValue])))
-            elif is_str(d[keyValue]):
-                d[keyValue] = ubits_to_string(uflip_bits(ustring_to_bits(d[keyValue])))
+            d[keyValue] = flip_bits_sequential(bits, i)
 
             if crashed: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
-    print("- Finished Flipping Bits")
+
+'''
+Sequentially flips randomly
+'''
+def flip_bits_random(data: json, filepath):
+    global crashed
+    keys = data.keys()
+    for keyValue in keys:
+        for i in range(0, 100):
+            d = copy.deepcopy(data)
+
+            if is_num(d[keyValue]):
+                d[keyValue] = ubits_to_number(uflip_bits_random(unumber_to_bits(d[keyValue])))
+            elif is_str(d[keyValue]):
+                d[keyValue] = ubits_to_string(uflip_bits_random(ustring_to_bits(d[keyValue])))
+
+            if crashed: return
+            if send_to_process(d, filepath):
+                crashed = True
+                return
+
+'''
+Sequentially flips randomly
+'''
+def change_bytes_sequential(data: json, filepath):
+    global crashed
+    keys = data.keys()
+    for keyValue in keys:
+        length = 0
+        if is_num(data[keyValue]):
+            length = len(str(data[keyValue]))
+        elif is_str(data[keyValue]):
+            length = len(data[keyValue])
+        for i in range(0, length):
+            d = copy.deepcopy(data)
+
+            d[keyValue] = replace_byte_at(d[keyValue], i, b'\xFF')
+            if crashed: return
+            if send_to_process(d, filepath):
+                crashed = True
+                return
+
+            d[keyValue] = replace_byte_at(d[keyValue], i, b'\x00')
+            if crashed: return
+            if send_to_process(d, filepath):
+                crashed = True
+                return
             
+            d[keyValue] = replace_byte_at(d[keyValue], i, randbytes(1))
+            if crashed: return
+            if send_to_process(d, filepath):
+                crashed = True
+                return
+
+'''
+Inserts a random number of bytes at a random location
+'''
+def insert_bytes_random(filepath, data):
+    global crashed
+    keys = data.keys()
+    for keyValue in keys:
+        length = 0
+        if is_num(data[keyValue]):
+            length = len(str(data[keyValue]))
+        elif is_str(data[keyValue]):
+            length = len(data[keyValue])
+        for i in range(0, length):
+            d = copy.deepcopy(data)
+
+            d[keyValue] = replace_byte_at(d[keyValue], randint(0, length - 1), randbytes(i))
+            if crashed: return
+            if send_to_process(d, filepath):
+                crashed = True
+                return
+
+'''
+Modifies certain fields to different fields with changing values
+'''
+def modify_fields(data: json, filepath):
+    global crashed
+    with open('./wordlists/keywords.txt', 'r') as file:
+        for line in file:
+            for type in type_swaps_arr:
+                d = copy.deepcopy(data)
+                
+                d[line] = type
+                
+                if crashed:
+                    file.close()
+                    return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+        file.close()
+
 '''
 Swap the types of JSON Fields to other types
 '''
 def swap_types(data: json, filepath):
     global crashed
-    print("> Swapping types of JSON Fields")
     keys = data.keys()
 
     for keyValue in keys:
@@ -275,4 +326,3 @@ def swap_types(data: json, filepath):
             if send_to_process(d, filepath):
                 crashed = True
                 return
-    print("- Finished Swapping Types")
