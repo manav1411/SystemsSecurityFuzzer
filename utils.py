@@ -83,7 +83,7 @@ Flips a bit at a position
 def uflip_bits_at(bits, index):
     bit_list = list(bits)
     flipped_bit = '1' if bit_list[index] == '0' else '0'
-    return bit_list[:index] + flipped_bit + bit_list[index + 1:]
+    return ''.join(bit_list[:index] + [flipped_bit] + bit_list[index + 1:])
 
 '''
 Converts a string to bits
@@ -123,18 +123,13 @@ def replace_byte_at(data, index, byte):
     # Convert byte to a string if it's an integer, and validate it
     if isinstance(byte, int):
         byte = chr(byte)
-    elif not isinstance(byte, str) or len(byte) != 1:
-        return ""
     
     # Convert data to a string if it is an integer
     if isinstance(data, int):
-        data = str(data)
-    
-    # Perform the replacement
-    new_data = data[:index] + byte + data[index + 1:]
-    
-    # Convert back to integer if the original data was an integer
-    if isinstance(data, int):
-        return int(new_data)
+        data = data.to_bytes(64)
+        new_data = data[:index] + byte.encode() + data[index + 1:]
+        return int.from_bytes(new_data)
+    else:
+        new_data = data[:index] + str(byte) + data[index + 1:]    
     
     return new_data

@@ -9,8 +9,8 @@ import threading
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = False 
-SEE_OUTPUTS = False
+SEE_INPUTS = True 
+SEE_OUTPUTS = True
 MAX_THREADS = 5
 
 '''
@@ -50,21 +50,21 @@ def is_json(words):
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    payload = json.dumps(payload)
-    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
-    
+    p = json.dumps(payload)
+    pcrashed, poutput, pcode = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
+
     global crashed
-    crashed = _crashed
+    crashed = pcrashed
 
     # Handles the program logging if it crashes
     if crashed:
         global start
-        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
+        handle_logging(p, filepath, pcode, len(found_paths), time.time() - start)
         return True
 
     # If a new output is found it is added to the queue
-    if _output not in found_paths:
-        found_paths.append(_output)
+    if poutput not in found_paths and not check_start_output(poutput, found_paths):
+        found_paths.append(poutput)
         add_to_thread_queue(filepath, payload)
 
     return False
@@ -75,9 +75,9 @@ Main function call to begin fuzzing JSON input binaries
 def fuzz_json(filepath, words):
     global start
     start = time.time()
-    words = json.loads(words)
+    w = json.loads(words)
 
-    send_to_process(words, filepath)
+    send_to_process(w, filepath)
 
     if perform_mutation():
         print_crash_found()
@@ -107,7 +107,7 @@ are no more processes to try and mutate
 '''
 def perform_mutation():
     global crashed, threads
-    while (len(threads)) > 0 and threading.active_count() > 1:
+    while (len(threads)) > 0 or threading.active_count() > 1:
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:
@@ -208,7 +208,10 @@ def flip_bits_sequential(data: json, filepath):
         for i in range(0, length):
             d = copy.deepcopy(data)
 
-            d[keyValue] = flip_bits_sequential(bits, i)
+            if is_num(d[keyValue]):
+                d[keyValue] = ubits_to_number(uflip_bits_at(bits, i))
+            elif is_str(d[keyValue]):
+                d[keyValue] = ubits_to_string(uflip_bits_at(bits, i))
 
             if crashed: return
             if send_to_process(d, filepath):
@@ -247,22 +250,26 @@ def change_bytes_sequential(data: json, filepath):
             length = len(str(data[keyValue]))
         elif is_str(data[keyValue]):
             length = len(data[keyValue])
+        else:
+            continue
+
+        if length > 100: length = 100
         for i in range(0, length):
             d = copy.deepcopy(data)
 
-            d[keyValue] = replace_byte_at(d[keyValue], i, b'\xFF')
+            d[keyValue] = replace_byte_at(data[keyValue], i, 0xFF)
             if crashed: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
 
-            d[keyValue] = replace_byte_at(d[keyValue], i, b'\x00')
+            d[keyValue] = replace_byte_at(data[keyValue], i, 0xFFFF)
             if crashed: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
-            
-            d[keyValue] = replace_byte_at(d[keyValue], i, randbytes(1))
+
+            d[keyValue] = replace_byte_at(data[keyValue], i, 0x00)
             if crashed: return
             if send_to_process(d, filepath):
                 crashed = True
@@ -271,19 +278,19 @@ def change_bytes_sequential(data: json, filepath):
 '''
 Inserts a random number of bytes at a random location
 '''
-def insert_bytes_random(filepath, data):
+def insert_bytes_random(data: json, filepath):
     global crashed
     keys = data.keys()
     for keyValue in keys:
-        length = 0
-        if is_num(data[keyValue]):
-            length = len(str(data[keyValue]))
-        elif is_str(data[keyValue]):
-            length = len(data[keyValue])
-        for i in range(0, length):
+        for i in range(0, 200):
             d = copy.deepcopy(data)
-
-            d[keyValue] = replace_byte_at(d[keyValue], randint(0, length - 1), randbytes(i))
+            if is_num(data[keyValue]): bytes = d[keyValue].to_bytes(2, 'little')
+            elif is_str(data[keyValue]): bytes = d[keyValue].encode('utf-8')
+            else: continue
+            if is_num(data[keyValue]):
+                d[keyValue] = int.from_bytes(insert_random_bytes_util(bytes, 15))
+            elif is_str(data[keyValue]):
+                d[keyValue] = insert_random_bytes_util(bytes, 200).decode('utf-8')
             if crashed: return
             if send_to_process(d, filepath):
                 crashed = True
@@ -326,3 +333,28 @@ def swap_types(data: json, filepath):
             if send_to_process(d, filepath):
                 crashed = True
                 return
+            
+'''
+Helper
+'''
+def insert_random_bytes_util(data, num_to_insert):
+    if isinstance(data, bytes):
+        # Convert to a mutable bytearray if input is immutable bytes
+        data = bytearray(data)
+    elif not isinstance(data, bytearray):
+        raise TypeError("Input must be bytes or bytearray.")
+        
+    length = len(data)
+    
+    for _ in range(num_to_insert):
+        # Generate a random byte and a random insertion position
+        random_byte = random.randint(0, 255)
+        position = random.randint(0, length)
+        
+        # Insert the random byte at the chosen position
+        data.insert(position, random_byte)
+        
+        # Update the length for the next insertion position
+        length += 1
+    
+    return bytes(data) if isinstance(data, bytes) else data

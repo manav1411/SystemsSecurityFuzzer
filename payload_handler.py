@@ -25,12 +25,12 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
         
     except Exception as e:
         print(e)
-        return False
-    
+        return False, "", 0
+
     if code != 0:
-        return (True, output, code)
+        return True, output, code
     else:
-        return (False, output, code)
+        return False, output, code
     
 '''
 Handles logging information when a binary does crash
@@ -38,32 +38,33 @@ Handles logging information when a binary does crash
 def handle_logging(payload, filepath, code, num_paths, time):
     output_file = './logs/log_' + filepath[11:] + '.txt'
     with open(output_file, 'w') as file:
-        if code != 0: 
+        if code != 0:
+            write_crash_output(filepath, payload)
             file.write(f'''
-                Binary: {filepath[11:]}
-                Program Exited with: {get_signal(code)}
-                Number of Paths Found: {num_paths}
-                Total Time Taken: {time}
-                Crashing Payload: {payload}
+Binary: {filepath[11:]}
+Program Exited with: {code} | {get_signal(code)}
+Number of Paths Found: {num_paths}
+Total Time Taken: {time}
+Crashing Payload: {payload}
             ''')
         else:
             file.write(f'''
-                Binary: {filepath[11:]}
-                Program Exited with: "Normal Exit (No Crash)"
-                Number of Paths Found: {num_paths}
-                Total Time Taken: {time}
+Binary: {filepath[11:]}
+Program Exited with: "Normal Exit (No Crash)"
+Number of Paths Found: {num_paths}
+Total Time Taken: {time}
             ''')
         file.close()
 
 '''
 Write the crash output to the file specified in the spec
 '''
-def write_crash_output(filename, input):
-    output_file = './fuzzer_output/bad_' + filename[11:] + '.txt'
+def write_crash_output(filepath, payload):
+    output_file = './fuzzer_output/bad_' + filepath[11:] + '.txt'
     with open(output_file, 'w') as file:
-        file.write(input)
+        file.write(payload)
         file.close()
-    print(f"Writing Input: ( {input} ) to Output File : ( {output_file} )")
+    print(f"Writing Input: ( {payload} ) to Output File : ( {output_file} )")
 
 
 '''
@@ -85,3 +86,13 @@ def get_signal(code):
     elif code == signal.SIGUSR1: return "SIGUSR1 - User Defined Signal (Unknown)"
     elif code == signal.SIGUSR2: return "SIGUSR2 - User Defined Signal (Unknown)"
     else: return "Unknown Signal Received"
+
+'''
+Checks whether a string match occurs within the first n chars to scan for duplicate outputs
+'''
+def check_start_output(o, paths):
+    length = 10 if len(o) > 10 else len(0) / 2
+    for path in paths:
+        if o[:length] in path:
+            return True
+    return False
