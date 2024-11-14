@@ -25,26 +25,23 @@ General Fuzzer (10 marks)
 
 ## Fuzzer functionality (10 marks)
 [5] Mutation Strategies
--Basic (bit flips, byte flips, known ints)
-Intermediate (repeated parts, keyword extraction, arithmetic)
-Advanced (coverage based mutations)
+- Basic (bit flips, byte flips, known ints)
+- Intermediate (repeated parts, keyword extraction, arithmetic)
+- Advanced (coverage based mutations)
 [5] Understanding & manipulating file formats (file headers/names, data structures, etc)
-Basic (JSON, CSV, XML)
-Intermediate (JPEG, ELF)
-Advanced (PDF)
-Harness Functionality (10 marks)
+- Basic (JSON, CSV, XML)
+- Intermediate (JPEG, ELF)
+- Advanced (PDF)
+
+## Harness Functionality (10 marks)
 [2] Detecting the type of crash
 [2] Detecting Code Coverage
 [2] Avoiding overheads
-Not creating files
-In memory resetting (Not calling execve)
+- Not creating files
+- In memory resetting (Not calling execve)
 [2] Useful logging / statistics collection and display
 [2] Detecting Hangs / Infinite loops
-Detecting infinite loop (code coverage) vs slow running program (timeout approach)
-Something awesome (6 marks)
-Can be either of:
+- Detecting infinite loop (code coverage) vs slow running program (timeout approach)
 
-Something cool your fuzzer does (consult course staff to see if your thing is valid).
-Finding novel / non-trivial bugs in Public Software / OSS Software with your fuzzer.
-Documentation (10 marks)
+## Documentation (10 marks)
 The documentation/writeup for the final fuzzer is worth 10 marks. Marks are awarded based on detail and conciseness of your writeup.

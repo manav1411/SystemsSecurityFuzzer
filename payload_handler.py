@@ -1,10 +1,8 @@
 import subprocess
 from utils import *
-import time
 import signal
 import os
 import subprocess
-from utils import *
 import time
 import os
 
@@ -50,6 +48,7 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
 Handles logging information when a binary does crash
 '''
 def handle_logging(payload, filepath, code, num_paths, ptime):
+    output_file = './logs.txt'
     if code != 0:
         if isinstance(payload, bytes):
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
@@ -65,12 +64,14 @@ def handle_logging(payload, filepath, code, num_paths, ptime):
             with open(bad, 'w') as badfile:
                 badfile.write(payload)
                 badfile.close()
-                
-            print(f'''
+        
+    with open(output_file, 'a') as file:
+        file.write(f'''
 Binary: {filepath[11:]}
 Program Exited with: {code} | {get_signal(code)}
 Number of Paths Found: {num_paths}
 Total time Taken: {ptime}''')
+        file.close()
 
 '''
 Returns a string about which signal was received that wasnt 0

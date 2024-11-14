@@ -10,13 +10,9 @@ from payload_handler import *
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
 SEE_OUTPUTS = False
-
-'''
-Global constants (threading-related)
-'''
-MAX_THREADS = 8
+MAX_THREADS = 10
 TIMEOUT_SECONDS = 60
 
 format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
@@ -266,6 +262,15 @@ def insert_ascii_control(filepath, data):
             if send_to_process(str(new), filepath) or send_to_process(new, filepath):
                 crashed = True
                 return
+
+'''
+Helper
+'''
+def uadd_random_bytes(s, num_bytes):
+    random_bytes = os.urandom(num_bytes)
+    index = random.randint(0, len(s))
+    b = s.encode()
+    return b[:index] + random_bytes + b[index:]
 
 '''
 Helper
