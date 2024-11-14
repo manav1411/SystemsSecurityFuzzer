@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from utils import *
+import subprocess
 import time
 import copy
 import random
@@ -60,7 +61,7 @@ Sends a given input to a process, then returns whether the process crashes or no
 '''
 def send_to_process(payload, filepath, payload_is_tree=True):
     if payload_is_tree:
-        # payload = payload.getroot()
+        payload = payload.getroot()
         payload = ET.tostring(payload, encoding="unicode")
 
     pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
@@ -80,10 +81,58 @@ def send_to_process(payload, filepath, payload_is_tree=True):
     # If a new output is found it is added to the queue
     if poutput not in found_paths and not check_start_output(poutput, found_paths):
         found_paths.append(poutput)
-        if payload_is_tree:
-            add_to_thread_queue(filepath, ET.fromstring(payload))
+        # add_to_thread_queue(filepath, payload)
 
     return False
+
+
+# def send_to_process(payload, filepath, payload_is_tree=True):
+#     if payload_is_tree:
+#         payload = payload.getroot()
+#         payload = ET.tostring(payload, encoding="unicode")
+
+#     if SEE_INPUTS:
+#         print(payload)
+#         print("end payload")
+    
+#     try:
+#         process = subprocess.run(
+#             [filepath],
+#             input=payload,
+#             text=True,
+#             capture_output=True
+#         )
+        
+#         # Capture the return code and output
+#         code = process.returncode
+#         output = process.stdout
+
+#         if PRINT_OUTPUTS:
+#             print(f"output: {output}")
+        
+#     except Exception as e:
+#         print(f"error: {e}")
+#         return False
+    
+#     if output == "":
+#         pass
+#     # A different traversal path has been found and hence it is added to the queue
+#     # elif output not in found_paths:
+#     #     # TODO: NOT SURE IF WE SHOULD KEEP THIS IN, STOPS US ITERATING OVER INPUTS THAT ARE DEEMED INVALID
+#     #     if not ("invalid" in output or "Invalid" in output):
+#     #         # Add the current payload into the queue
+#     #         # queue.append(ET.fromstring(payload))
+
+#     #         # Adds the output so we don't encounter it again and keep appending 
+#     #         found_paths.append(output)
+#     #         print_new_path_found()
+#     #         time.sleep(1)
+    
+#     if code != 0:
+#         write_crash_output(filepath, payload)
+#         return True
+#     else:
+#         return False
 
 
 '''
@@ -94,90 +143,32 @@ def fuzz_xml(filepath, inputpath):
     start = time.time()
     tree = ET.parse(inputpath)
 
-    send_to_process(tree.getroot(), filepath)
+    send_to_process(tree, filepath)
 
     # # item is xml tree
     d = copy.deepcopy(tree)
-    if perform_mutation():
+    if perform_mutation(filepath, d):
         print_crash_found()
         return
 
     handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
-# '''
-# Main function call to begin fuzzing XML input binaries (old)
-# '''
-# def fuzz_xml(filepath, inputpath):
-#     global start
-#     start = time.time()
-#     tree = ET.parse(inputpath)
-
-#     send_to_process(tree, filepath)
-
-#     # # item is xml tree
-#     d = copy.deepcopy(tree)
-#     if perform_mutation(filepath, d):
-#         print_crash_found()
-#         exit()
-
-#     handle_logging("", filepath, 0, len(found_paths), time.time() - start)
-#     print_no_crash_found()
-
 
 '''
-Adds a given payloads threads to the queue
+Begins the mutation process
 '''
-def add_to_thread_queue(filepath, data):
-    global threads
-    threads.append(threading.Thread(target=keyword_extraction, args=(data, filepath)))
-    threads.append(threading.Thread(target=rearrange_elements, args=(data, filepath)))
-    threads.append(threading.Thread(target=flip_bits, args=(data, filepath)))
-    threads.append(threading.Thread(target=mutate_attributes, args=(data, filepath)))
-    threads.append(threading.Thread(target=mutate_text, args=(data, filepath)))
-    threads.append(threading.Thread(target=swap_types, args=(data, filepath)))
-    threads.append(threading.Thread(target=duplicate_elements, args=(data, filepath)))
-    threads.append(threading.Thread(target=remove_elements, args=(data, filepath)))
-    threads.append(threading.Thread(target=malform_xml, args=(data, filepath)))
-
-
-'''
-Continously runs threads until the program crashes or there
-are no more processes to try and mutate
-'''
-def perform_mutation():
-    global crashed, kill, threads, start
-    while (len(threads)) > 0 or threading.active_count() > 1:
-        if (time.time() - start > TIMEOUT_SECONDS):
-            print("Timeout - Killing all Threads")
-            kill = True
-            return False
-        if crashed:
-            time.sleep(1)
-            return True
-        elif threading.active_count() >= MAX_THREADS:
-            continue
-        elif len(threads) != 0:
-            t = threads.pop()
-            t.start()
-
+def perform_mutation(filepath, data):
+    if duplicate_elements(data, filepath): return True
+    if remove_elements(data, filepath): return True
+    if rearrange_elements(data, filepath): return True
+    if malform_xml(data, filepath): return True
+    if keyword_extraction(data, filepath): return True
+    if mutate_attributes(data, filepath): return True
+    if mutate_text(data, filepath): return True
+    if flip_bits(data, filepath): return True
+    if swap_types(data, filepath): return True
     return False
-
-# '''
-# Begins the mutation process (old)
-# '''
-# def perform_mutation(filepath, data):
-#     if duplicate_elements(data, filepath): return True
-#     if remove_elements(data, filepath): return True
-#     if rearrange_elements(data, filepath): return True
-#     if malform_xml(data, filepath): return True
-#     if keyword_extraction(data, filepath): return True
-#     if mutate_attributes(data, filepath): return True
-#     if mutate_text(data, filepath): return True
-#     if flip_bits(data, filepath): return True
-#     if swap_types(data, filepath): return True
-#     return False
-
 
 
 '''
@@ -187,24 +178,24 @@ def duplicate_elements(data, filepath):
     # print("> Testing Duplicating elements")
     for i in [2000, 100, 10]:
         # print(f"  > Adding {i} Duplicate Elements")
-        root = copy.deepcopy(data)
-        # root = d.getroot()
+        d = copy.deepcopy(data)
+        root = d.getroot()
         dup = root[0]
 
         for j in range(i):
             root.append(dup)
 
-        if send_to_process(root, filepath):
+        if send_to_process(d, filepath):
             return True
     
     # Duplicate whole tree
-    r1 = copy.deepcopy(data)
-    r2 = copy.deepcopy(data)
-    # r1 = d1.getroot()
-    # r2 = d2.getroot()
+    d1 = copy.deepcopy(data)
+    d2 = copy.deepcopy(data)
+    r1 = d1.getroot()
+    r2 = d2.getroot()
     r1.append(r2)
 
-    if send_to_process(r1, filepath):
+    if send_to_process(d1, filepath):
         return True
     
     return False
@@ -214,23 +205,22 @@ Removes each of the root child XML nodes - both one at a time & cumulatively
 '''
 def remove_elements(data, filepath):
     # print("> Testing Removing Fields")
-    # root = data.getroot()
-    root = data
+    root = data.getroot()
     i = 0
-    r1 = copy.deepcopy(data)
-    # r1 = d1.getroot()
+    d1 = copy.deepcopy(data)
+    r1 = d1.getroot()
     for child in root:
-        r2 = copy.deepcopy(data)
-        # r2 = d2.getroot()
+        d2 = copy.deepcopy(data)
+        r2 = d2.getroot()
         # print(f"    > Deleting Field {child.tag}")
         r2.remove(r2[i])
         i = i + 1
 
-        if send_to_process(r2, filepath):
+        if send_to_process(d2, filepath):
             return True
         
         r1.remove(r1[0])
-        if send_to_process(r1, filepath):
+        if send_to_process(d1, filepath):
             return True
     
     return False
@@ -240,11 +230,10 @@ Rearrranges the root child XML nodes
 '''
 def rearrange_elements(data, filepath):
     # print("> Testing Rearrange Fields")
-    # root = data.getroot()
-    root = data
+    root = data.getroot()
     n = len(list(root))
-    r = copy.deepcopy(data)
-    # r = d.getroot()
+    d = copy.deepcopy(data)
+    r = d.getroot()
 
     children = list(r)
     random.shuffle(children)
@@ -255,7 +244,7 @@ def rearrange_elements(data, filepath):
     for i in range(n):
         r.remove(r[i])
 
-    if send_to_process(r, filepath):
+    if send_to_process(d, filepath):
         return True
        
     return False
@@ -266,8 +255,8 @@ Produces malformed xml (without closing tag / only partial data)
 def malform_xml(data, filepath):
     # print("> Testing malforming xml")
 
-    r = copy.deepcopy(data)
-    # r = d.getroot()
+    d = copy.deepcopy(data)
+    r = d.getroot()
     xml_str = ET.tostring(r, encoding="unicode")
 
     # xml without closing tag
@@ -287,17 +276,16 @@ Extracts keywords from element attributes and mutates them if found
 '''
 def keyword_extraction(data, filepath):
     # print("> Keyword extraction")
-    # parent = data.getroot()
-    parent = data
+    parent = data.getroot()
 
     for child in parent.iter():
         for item in child.items():
             if (item[0]).lower() in keyword_arr:
                 for mutate in keyword_swap_arr:
-                    r = copy.deepcopy(data)
+                    d = copy.deepcopy(data)
                     child.set(item[0], mutate)
 
-                    if (send_to_process(r, filepath)):
+                    if (send_to_process(d, filepath)):
                         return True
 
     return False
@@ -308,30 +296,29 @@ Mutates attributes within the xml to different values
 '''
 def mutate_attributes(data, filepath):
     # print("> Mutating Attributes")
-    # parent = data.getroot()
-    parent = data
+    parent = data.getroot()
 
     for child in parent.iter():
         for item in child.items():
             try: 
                 int(item[1], 0)
-                with open('./src/wordlists/allnumber.txt', 'r') as file:
+                with open('./wordlists/allnumber.txt', 'r') as file:
                     for line in file:
-                        r = copy.deepcopy(data)
+                        d = copy.deepcopy(data)
                         child.set(item[0], line)
 
-                        if (send_to_process(r, filepath)):
+                        if (send_to_process(d, filepath)):
                             file.close()
                             return True
                     file.close()
 
             except:
-                with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+                with open('./wordlists/naughtystrings.txt', 'r') as file:
                     for line in file:
-                        r = copy.deepcopy(data)
+                        d = copy.deepcopy(data)
                         child.set(item[0], line)
 
-                        if (send_to_process(r, filepath)):
+                        if (send_to_process(d, filepath)):
                             file.close()
                             return True
                     file.close()
@@ -343,17 +330,16 @@ Mutates text within the xml to different values
 '''
 def mutate_text(data, filepath):
     # print("> Mutating Text")
-    # parent = data.getroot()
-    parent = data
+    parent = data.getroot()
 
     for child in parent.iter():
         # print(child.text)
-        with open('./src/wordlists/naughtystrings.txt', 'r') as file:
+        with open('./wordlists/naughtystrings.txt', 'r') as file:
             for line in file:
-                r = copy.deepcopy(data)
+                d = copy.deepcopy(data)
                 child.text = line
 
-                if (send_to_process(r, filepath)):
+                if (send_to_process(d, filepath)):
                     file.close()
                     return True
             file.close()
@@ -366,17 +352,17 @@ Mutates attributes with the bits randomly flipped
 '''
 def flip_bits(data, filepath):
     # print("> Flipping Bits")
-    # parent = data.getroot()
-    parent = data
+
+    parent = data.getroot()
     for child in parent.iter():
         for item in child.items():
             for i in range(0, 100):
-                r = copy.deepcopy(data)
+                d = copy.deepcopy(data)
                 
                 if is_str(item[1]):
-                    child.set(item[0], ubits_to_string(uflip_bits(ustring_to_bits(item[1]))))
+                    child.set(item[0], ubits_to_string(uflip_bits_random(ustring_to_bits(item[1]))))
 
-                if (send_to_process(r, filepath)):
+                if (send_to_process(d, filepath)):
                     return True
             
     return False
@@ -387,15 +373,14 @@ Swap the attributes of XML elements to other tags
 '''
 def swap_types(data: json, filepath):
     # print("Swapping types of XML attributes")
-    # parent = data.getroot()
-    parent = data
+    parent = data.getroot()
     for child in parent.iter():
         for item in child.items():
             for type in type_swaps_arr:
-                r = copy.deepcopy(data)
+                d = copy.deepcopy(data)
 
                 child.set(item[0], type)
 
-                if (send_to_process(r, filepath)):
+                if (send_to_process(d, filepath)):
                     return True
     return False
