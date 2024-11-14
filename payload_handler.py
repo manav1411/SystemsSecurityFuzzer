@@ -4,6 +4,7 @@ import time
 import subprocess
 from utils import *
 import time
+import os
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
@@ -48,6 +49,8 @@ Handles logging information when a binary does crash
 '''
 def handle_logging(payload, filepath, code, num_paths, ptime):
     output_file = './logs/log_' + filepath[11:] + '.txt'
+    # Creates directories for output the first time it's called
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     if code != 0:
         with open(output_file, 'w') as file:
             file.write(f'''
@@ -58,11 +61,15 @@ Total time Taken: {ptime}''')
             file.close()
         if isinstance(payload, bytes):
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            # Creates directories for output the first time it's called
+            os.makedirs(os.path.dirname(bad), exist_ok=True)
             with open(bad, 'wb') as badfile:
                 badfile.write(payload)
                 badfile.close()
         else:
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            # Creates directories for output the first time it's called
+            os.makedirs(os.path.dirname(bad), exist_ok=True)
             with open(bad, 'w') as badfile:
                 badfile.write(payload)
                 badfile.close()
