@@ -16,7 +16,7 @@ SEE_OUTPUTS = False
 MAX_THREADS = 5
 
 '''
-Mutation Defines
+Defines
 '''
 MASSIVE_STRING = 'A' * 10000
 MASSIVE_P_STRING = '%P' * 10000
@@ -167,9 +167,7 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=mutate_delimiters, args=(data, filepath)))
     threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 50)))
     threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 0)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 100)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 200)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 300)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
 
 '''
@@ -371,18 +369,37 @@ def mutate_index(data: list, filepath, startNum):
     width = len(data[0])
     height = len(data)
 
-    for x in range (startNum, startNum + 100):
+    for x in range (startNum, startNum + 500):
         for i in range(0, height):
-            for j in range (0, width):
-                d = copy.deepcopy(data)
-                    
-                d[i][j] = 'A' * x
+                for j in range (0, width):
+                    d = copy.deepcopy(data)
+                        
+                    d[i][j] = 'A' * x
 
-                if crashed: return
-                if send_to_process(d, filepath):
-                    crashed = True
-                    return
+                    if crashed: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
     return
+
+'''
+Replaces a random value with another random value
+'''
+def replace_random_with_value(string, replacement):
+    if not string:  # If the string is empty, return it as-is
+        return string
+
+    # Convert the string to a list of characters to modify it
+    string_list = list(string)
+
+    # Select a random index
+    random_index = random.randint(0, len(string_list) - 1)
+
+    # Replace the character at the selected index with '\0'
+    string_list[random_index] = replacement
+
+    # Join the list back into a string and return it
+    return ''.join(string_list)
 
 '''
 Sends format string payloads

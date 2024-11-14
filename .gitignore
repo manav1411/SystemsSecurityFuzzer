@@ -1,6 +1,5 @@
 bad_*.txt
 log_*.txt
-*.c
 __pycache__
 core
 .history/
