@@ -3,6 +3,7 @@ import fuzz_csv
 import fuzz_jpeg
 import fuzz_plaintext
 import fuzz_elf
+import fuzz_xml
 
 # ANSI colors
 RESET = "\033[0m"
@@ -40,6 +41,9 @@ def fuzz(file, input):
     elif fuzz_jpeg.is_jpeg(words):
         print("Found JPEG Input > Fuzzing")
         fuzz_jpeg.fuzz_jpeg(filepath, words)
+    elif fuzz_xml.is_xml(inputpath):
+        print("Found XML Input  > Fuzzing")
+        fuzz_xml.fuzz_xml(filepath, inputpath)
     elif fuzz_csv.is_csv(words.decode("utf-8")):
         print("Found CSV Input  > Fuzzing")
         fuzz_csv.fuzz_csv(filepath, words.decode("utf-8"))
