@@ -1,0 +1,5 @@
+
+Binary: plaintext2
+Program Exited with: 0 | Normal Return (No Crash)
+Number of Paths Found: 3
+Total time Taken: 60.002190351486206

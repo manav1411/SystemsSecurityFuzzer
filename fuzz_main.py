@@ -2,6 +2,7 @@ import fuzz_json
 import fuzz_csv
 import fuzz_jpeg
 import fuzz_plaintext
+import os
 
 # ANSI colors
 RESET = "\033[0m"
@@ -13,6 +14,8 @@ def fuzz(file, input):
     print(f"Fuzzing Binary: {file}")
     filepath = './binaries/' + file # Binary Name
     inputpath = './example_inputs/' + input # Test Input Name
+    if os.path.isfile('./log.txt'):
+        os.remove('./logs.txt')
 
     # Checks binary file exists
     try:
