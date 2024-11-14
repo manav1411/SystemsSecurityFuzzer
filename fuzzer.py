@@ -27,8 +27,9 @@ if __name__ == "__main__":
             # main.fuzz(binaries[i], binaries[i] + ".txt")
             programs.append(multiprocessing.Process(target=fuzz_main.fuzz, args=(binaries[i], binaries[i] + ".txt")))
 
-        while len(programs) > 0:
-            if len(multiprocessing.active_children()) >= MAX_CORES:
+        while len(programs) > 0 or active_children:
+            active_children = len(multiprocessing.active_children())
+            if active_children >= MAX_CORES:
                 continue
             run = programs.pop()
             run.start()

@@ -9,7 +9,7 @@ import threading
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = True 
+SEE_INPUTS = False 
 SEE_OUTPUTS = False
 MAX_THREADS = 5
 
@@ -18,6 +18,7 @@ Mutations defines
 '''
 arr_of_types = ["A" * 400, -1389054671389658013709571389065891365890189164, json.loads('{"Name": "Jennifer Smith"}'), ["A", 1234, "Meow", -9999], None, True, False]
 type_swaps_arr = ["A" * 2000, -9999999999999999999999999999999999999999999999999999999999999999999, json.loads('{"Name": "Jennifer Smith","Contact Number": 7867567898,"Email": "jen123@gmail.com","Hobbies":["Reading", "Sketching", "Horse Riding"]}'), arr_of_types, None, True, False]
+format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
 
 '''
 For code coverage
@@ -100,6 +101,7 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=swap_types, args=(data, filepath)))
     threads.append(threading.Thread(target=add_fields, args=(data, filepath)))
     threads.append(threading.Thread(target=remove_fields, args=(data, filepath)))
+    threads.append(threading.Thread(target=send_format_strings, args=(data, filepath)))
 
 '''
 Continously runs threads until the program crashes or there
@@ -108,7 +110,8 @@ are no more processes to try and mutate
 def perform_mutation():
     global crashed, threads
     while (len(threads)) > 0 or threading.active_count() > 1:
-        if crashed: 
+        if crashed:
+            time.sleep(1)
             return True
         elif threading.active_count() >= MAX_THREADS:
             continue
@@ -333,7 +336,30 @@ def swap_types(data: json, filepath):
             if send_to_process(d, filepath):
                 crashed = True
                 return
-            
+
+'''
+Sends format string payloads
+'''
+def send_format_strings(data: json, filepath):
+    global crashed
+    keys = data.keys()
+
+    for keyValue in keys:
+        for num in range(0, 51):
+            d = copy.deepcopy(data)
+            for format_spec in format_string_specifiers:
+                if num == 0:
+                    format_string = f'%{format_spec}'
+                else:
+                    format_string = f'%{num}${format_spec}'
+                
+                d[keyValue] = format_string
+
+                if crashed: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+
 '''
 Helper
 '''

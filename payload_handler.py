@@ -47,8 +47,7 @@ def handle_logging(payload, filepath, code, num_paths, ptime):
     output_file = './logs/log_' + filepath[11:] + '.txt'
     if code != 0:
         with open(output_file, 'w') as file:
-            file.write(f'''
-Binary: {filepath[11:]}
+            file.write(f'''Binary: {filepath[11:]}
 Program Exited with: {code} | {get_signal(code)}
 Number of Paths Found: {num_paths}
 Total time Taken: {ptime}''')
@@ -65,8 +64,7 @@ Total time Taken: {ptime}''')
                 badfile.close()
     else:
         with open(output_file, 'w') as file:
-            file.write(f'''
-Binary: {filepath[11:]}
+            file.write(f'''Binary: {filepath[11:]}
 Program Exited with: Normal Exit (No Crash)
 Number of Paths Found: {num_paths}
 Total time Taken: {ptime}''')
@@ -99,9 +97,9 @@ def check_start_output(o, paths):
     length = 10 if len(o) > 10 else len(o) / 2
     for path in paths:
         if isinstance(o, bytes):
-            if o[:length] in path:
+            if o[:length].encode() in path:
                 return True
         else:
-            if o[:length].encode() in path:
+            if o[:length] in path:
                 return True
     return False

@@ -15,15 +15,19 @@ SEE_INPUTS = False
 SEE_OUTPUTS = False
 MAX_THREADS = 5
 
+'''
+Mutation Defines
+'''
 MASSIVE_STRING = 'A' * 10000
 MASSIVE_P_STRING = '%P' * 10000
-
 delimiters_mutations_arr = [
     "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
     "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
     "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
     "}", "[", "]", "\"", "\'", "\0"
 ]
+format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
+
 
 '''
 For code coverage
@@ -163,7 +167,9 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=mutate_delimiters, args=(data, filepath)))
     threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 50)))
     threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 0)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 100)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 200)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 300)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
 
 '''
@@ -365,18 +371,43 @@ def mutate_index(data: list, filepath, startNum):
     width = len(data[0])
     height = len(data)
 
-    for x in range (startNum, startNum + 500):
+    for x in range (startNum, startNum + 100):
         for i in range(0, height):
-                for j in range (0, width):
-                    d = copy.deepcopy(data)
-                        
-                    d[i][j] = 'A' * x
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                    
+                d[i][j] = 'A' * x
 
-                    if crashed: return
-                    if send_to_process(d, filepath):
-                        crashed = True
-                        return
+                if crashed: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
     return
+
+'''
+Sends format string payloads
+'''
+def send_format_strings(data: list, filepath):
+    global crashed
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                for num in range(0, 51):
+                    d = copy.deepcopy(data)
+                    for format_spec in format_string_specifiers:
+                        if num == 0:
+                            format_string = f'%{format_spec}'
+                        else:
+                            format_string = f'%{num}${format_spec}'
+                        
+                        d[i][j] = format_string
+
+                        if crashed: return
+                        if send_to_process(d, filepath):
+                            crashed = True
+                            return
 
 '''
 Replaces a random value with another random value
