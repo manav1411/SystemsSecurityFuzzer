@@ -2,8 +2,6 @@ import fuzz_json
 import fuzz_csv
 import fuzz_jpeg
 import fuzz_plaintext
-import fuzz_xml
-import fuzz_elf
 import os
 
 # ANSI colors
