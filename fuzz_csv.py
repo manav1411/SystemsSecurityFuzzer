@@ -516,6 +516,51 @@ def test_empty_cells(data: list, filepath):
                         return
 
 '''
+Tests emptying random cells within the CSV
+'''
+def test_empty_cells(data: list, filepath):
+    global crashed, kill
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+
+                del d[i][j]
+
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+    
+    if width > 1:
+        for i in range(0, height):
+                for j in range (0, width-1):
+                    d = copy.deepcopy(data)
+
+                    del d[i][j]
+                    del d[i][j]
+
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
+    
+    if height > 1: 
+        for i in range(0, height-1):
+                for j in range (0, width):
+                    d = copy.deepcopy(data)
+
+                    del d[i][j]
+                    del d[i+1][j]
+
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
+
+'''
 Replaces a random value with another random value
 '''
 def replace_random_with_value(string, replacement):

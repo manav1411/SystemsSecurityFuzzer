@@ -4,6 +4,7 @@ import fuzz_jpeg
 import fuzz_plaintext
 import fuzz_elf
 import fuzz_xml
+import os
 
 # ANSI colors
 RESET = "\033[0m"
