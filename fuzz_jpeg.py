@@ -10,6 +10,7 @@ Switch to True if you want to see the inputs being send to the binary
 SEE_INPUTS = False
 SEE_OUTPUTS = False
 MAX_THREADS = 5
+TIMEOUT_SECONDS = 60
 
 '''
 File Structure Bytes of JPEG File - Don't know how important these are in fuzzing
@@ -81,6 +82,7 @@ start = 0
 Threads for multithreading
 '''
 crashed = False
+kill = False
 threads = []
 
 '''
@@ -96,8 +98,11 @@ Sends a given input to a process, then returns whether the process crashes or no
 def send_to_process(payload, filepath):
     _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    global crashed
+    global crashed, kill
     crashed = _crashed
+
+    if kill:
+        return False
 
     # Handles the program logging if it crashes
     if crashed:
@@ -146,8 +151,12 @@ Continously runs threads until the program crashes or there
 are no more processes to try and mutate
 '''
 def perform_mutation():
-    global crashed, threads
+    global crashed, threads, kill, start
     while (len(threads)) > 0 or threading.active_count() > 1:
+        if (time.time() - start > TIMEOUT_SECONDS):
+            print("Timeout - Killing all Threads")
+            kill = True
+            return False
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:

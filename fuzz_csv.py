@@ -11,9 +11,10 @@ from payload_handler import *
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
 SEE_OUTPUTS = False
 MAX_THREADS = 5
+TIMEOUT_SECONDS = 60
 
 '''
 Defines
@@ -43,6 +44,7 @@ start = 0
 Threads for multithreading
 '''
 crashed = False
+kill = False
 threads = []
 
 '''
@@ -100,8 +102,11 @@ def send_to_process(payload, filepath):
     p = list_to_csv(payload, ',')
     _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    global crashed
+    global crashed, kill
     crashed = _crashed
+
+    if kill:
+        return False
 
     # Handles the program logging if it crashes
     if crashed:
@@ -121,8 +126,11 @@ def send_to_process_newdelim(payload, filepath, delim):
     p = list_to_csv(payload, delim)
     _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
-    global crashed
+    global crashed, kill
     crashed = _crashed
+
+    if kill:
+        return False
 
     # Handles the program logging if it crashes
     if crashed:
@@ -175,8 +183,12 @@ Continously runs threads until the program crashes or there
 are no more processes to try and mutate
 '''
 def perform_mutation():
-    global crashed, threads
+    global crashed, kill, threads, start
     while (len(threads)) > 0 or threading.active_count() > 1:
+        if (time.time() - start > TIMEOUT_SECONDS):
+            print("Timeout - Killing all Threads")
+            kill = True
+            return False
         if crashed: 
             return True
         elif threading.active_count() >= MAX_THREADS:
@@ -191,7 +203,7 @@ def perform_mutation():
 Adds 1 - 100 New Rows
 '''
 def add_rows(data: list, filepath):
-    global crashed
+    global crashed, kill
     d = copy.deepcopy(data)
     rowlen = len(d[0])
     for i in range(1, 101):
@@ -202,7 +214,7 @@ def add_rows(data: list, filepath):
 
         d.append(row)
 
-        if crashed: return
+        if crashed or kill: return
         if send_to_process(d, filepath):
             crashed = True
             return
@@ -211,14 +223,14 @@ def add_rows(data: list, filepath):
 Adds 1 - 100 New Cols
 '''
 def add_cols(data: list, filepath):
-    global crashed
+    global crashed, kill
     d = copy.deepcopy(data)
     for i in range(1, 101):
         
         for row in d:
             row.append(random.choice(string.ascii_letters))
 
-        if crashed: return
+        if crashed or kill: return
         if send_to_process(d, filepath):
             crashed = True
             return
@@ -227,7 +239,7 @@ def add_cols(data: list, filepath):
 Adds both extra rows and columns at the same time
 '''
 def add_cols_and_rows(data: list, filepath):
-    global crashed
+    global crashed, kill
     d = copy.deepcopy(data)
     for i in range(1, 101):
         
@@ -241,7 +253,7 @@ def add_cols_and_rows(data: list, filepath):
 
         d.append(newrow)
 
-        if crashed: return
+        if crashed or kill: return
         if send_to_process(d, filepath):
             crashed = True
             return
@@ -250,7 +262,7 @@ def add_cols_and_rows(data: list, filepath):
 Changes every cell in the CSV to all defined num values
 '''
 def mutate_data_ints(data: list, filepath):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -262,7 +274,7 @@ def mutate_data_ints(data: list, filepath):
                         
                         d[i][j] = line.strip()
                         
-                        if crashed:
+                        if crashed or kill:
                             file.close()
                             return
                         if send_to_process(d, filepath):
@@ -276,7 +288,7 @@ def mutate_data_ints(data: list, filepath):
 Changes every cell in the CSV to all defined delimiter values
 '''
 def mutate_data_values_with_delimiters(data: list, filepath):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -287,7 +299,7 @@ def mutate_data_values_with_delimiters(data: list, filepath):
                     
                     d[i][j] = delim
 
-                    if crashed: return
+                    if crashed or kill: return
                     if send_to_process(d, filepath):
                         crashed = True
                         return
@@ -296,11 +308,11 @@ def mutate_data_values_with_delimiters(data: list, filepath):
 Mutates the delimiters for the CSV File
 '''
 def mutate_delimiters(data: list, filepath):
-    global crashed
+    global crashed, kill
     for delim in delimiters_mutations_arr:
         d = copy.deepcopy(data)
         
-        if crashed: return
+        if crashed or kill: return
         if send_to_process_newdelim(d, filepath, delim):
             crashed = True
             return
@@ -309,7 +321,7 @@ def mutate_delimiters(data: list, filepath):
 Flips bits of the values contained within the CSV
 '''
 def flip_bits(data: list, filepath, numflips):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -330,7 +342,7 @@ def flip_bits(data: list, filepath, numflips):
                     d[i][j] = back_to_string
 
                     
-                    if crashed: return
+                    if crashed or kill: return
                     if send_to_process(d, filepath):
                         crashed = True
                         return
@@ -339,7 +351,7 @@ def flip_bits(data: list, filepath, numflips):
 Mutates the strings within the CSV
 '''
 def mutate_strings(data: list, filepath):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -351,7 +363,7 @@ def mutate_strings(data: list, filepath):
                         
                         d[i][j] = line.strip()
                         
-                        if crashed:
+                        if crashed or kill:
                             file.close()
                             return
                         if send_to_process(d, filepath):
@@ -365,7 +377,7 @@ def mutate_strings(data: list, filepath):
 Tries to add 1 - 1000 length strings in each index of the CSV
 '''
 def mutate_index(data: list, filepath, startNum):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -376,7 +388,7 @@ def mutate_index(data: list, filepath, startNum):
                         
                     d[i][j] = 'A' * x
 
-                    if crashed: return
+                    if crashed or kill: return
                     if send_to_process(d, filepath):
                         crashed = True
                         return
@@ -405,7 +417,7 @@ def replace_random_with_value(string, replacement):
 Sends format string payloads
 '''
 def send_format_strings(data: list, filepath):
-    global crashed
+    global crashed, kill
     width = len(data[0])
     height = len(data)
 
@@ -421,7 +433,7 @@ def send_format_strings(data: list, filepath):
                         
                         d[i][j] = format_string
 
-                        if crashed: return
+                        if crashed or kill: return
                         if send_to_process(d, filepath):
                             crashed = True
                             return

@@ -3,7 +3,6 @@ import copy
 import time
 from utils import *
 from payload_handler import *
-from random import randbytes, randint
 import threading
 
 '''
@@ -12,6 +11,7 @@ Switch to True if you want to see the inputs being send to the binary
 SEE_INPUTS = False 
 SEE_OUTPUTS = False
 MAX_THREADS = 5
+TIMEOUT_SECONDS = 60
 
 '''
 Mutations defines
@@ -34,6 +34,7 @@ start = 0
 Threads for multithreading
 '''
 crashed = False
+kill = False
 threads = []
 
 '''
@@ -54,8 +55,11 @@ def send_to_process(payload, filepath):
     p = json.dumps(payload)
     pcrashed, poutput, pcode = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
 
-    global crashed
+    global crashed, kill
     crashed = pcrashed
+
+    if kill:
+        return False
 
     # Handles the program logging if it crashes
     if crashed:
@@ -108,8 +112,12 @@ Continously runs threads until the program crashes or there
 are no more processes to try and mutate
 '''
 def perform_mutation():
-    global crashed, threads
+    global crashed, kill, threads, start
     while (len(threads)) > 0 or threading.active_count() > 1:
+        if (time.time() - start > TIMEOUT_SECONDS):
+            print("Timeout - Killing all Threads")
+            kill = True
+            return False
         if crashed:
             time.sleep(1)
             return True
@@ -125,14 +133,14 @@ def perform_mutation():
 Adds Fields to the JSON
 '''
 def add_fields(data: json, filepath):
-    global crashed
+    global crashed, kill
     for i in range(1,1001):
         d = copy.deepcopy(data)
 
         for j in range (0, i):
             d[f"RandomField{j}"] = f"RandomValue{j}"
 
-        if crashed: return
+        if crashed or kill: return
         if send_to_process(d, filepath):
             crashed = True
             return
@@ -141,12 +149,12 @@ def add_fields(data: json, filepath):
 Removes Fields to the JSON
 '''
 def remove_fields(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()  
     for keyValue in keys:
         d = copy.deepcopy(data)
         del d[keyValue]
-        if crashed: return
+        if crashed or kill: return
         if send_to_process(d, filepath):
             crashed = True
             return
@@ -155,7 +163,7 @@ def remove_fields(data: json, filepath):
 Mutates fields within the JSON to different number values
 '''
 def mutate_with_nums(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         with open('./wordlists/allnumber.txt', 'r') as file:
@@ -164,7 +172,7 @@ def mutate_with_nums(data: json, filepath):
                 
                 d[keyValue] = line
 
-                if crashed: 
+                if crashed or kill: 
                     file.close()
                     return
                 if (send_to_process(d, filepath)):
@@ -177,7 +185,7 @@ def mutate_with_nums(data: json, filepath):
 Mutates fields within the JSON to different number values
 '''
 def mutate_with_strings(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         with open('./wordlists/naughtystrings.txt', 'r') as file:
@@ -198,7 +206,7 @@ def mutate_with_strings(data: json, filepath):
 Sequentially flips bits one at a time
 '''
 def flip_bits_sequential(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         length = 0
@@ -216,7 +224,7 @@ def flip_bits_sequential(data: json, filepath):
             elif is_str(d[keyValue]):
                 d[keyValue] = ubits_to_string(uflip_bits_at(bits, i))
 
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
@@ -225,7 +233,7 @@ def flip_bits_sequential(data: json, filepath):
 Sequentially flips randomly
 '''
 def flip_bits_random(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         for i in range(0, 100):
@@ -236,7 +244,7 @@ def flip_bits_random(data: json, filepath):
             elif is_str(d[keyValue]):
                 d[keyValue] = ubits_to_string(uflip_bits_random(ustring_to_bits(d[keyValue])))
 
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
@@ -245,7 +253,7 @@ def flip_bits_random(data: json, filepath):
 Sequentially flips randomly
 '''
 def change_bytes_sequential(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         length = 0
@@ -261,19 +269,19 @@ def change_bytes_sequential(data: json, filepath):
             d = copy.deepcopy(data)
 
             d[keyValue] = replace_byte_at(data[keyValue], i, 0xFF)
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
 
             d[keyValue] = replace_byte_at(data[keyValue], i, 0xFFFF)
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
 
             d[keyValue] = replace_byte_at(data[keyValue], i, 0x00)
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
@@ -282,7 +290,7 @@ def change_bytes_sequential(data: json, filepath):
 Inserts a random number of bytes at a random location
 '''
 def insert_bytes_random(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
     for keyValue in keys:
         for i in range(0, 200):
@@ -294,7 +302,7 @@ def insert_bytes_random(data: json, filepath):
                 d[keyValue] = int.from_bytes(insert_random_bytes_util(bytes, 15))
             elif is_str(data[keyValue]):
                 d[keyValue] = insert_random_bytes_util(bytes, 200).decode('utf-8')
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
@@ -303,7 +311,7 @@ def insert_bytes_random(data: json, filepath):
 Modifies certain fields to different fields with changing values
 '''
 def modify_fields(data: json, filepath):
-    global crashed
+    global crashed, kill
     with open('./wordlists/keywords.txt', 'r') as file:
         for line in file:
             for type in type_swaps_arr:
@@ -323,7 +331,7 @@ def modify_fields(data: json, filepath):
 Swap the types of JSON Fields to other types
 '''
 def swap_types(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
 
     for keyValue in keys:
@@ -332,7 +340,7 @@ def swap_types(data: json, filepath):
             
             d[keyValue] = type
 
-            if crashed: return
+            if crashed or kill: return
             if send_to_process(d, filepath):
                 crashed = True
                 return
@@ -341,7 +349,7 @@ def swap_types(data: json, filepath):
 Sends format string payloads
 '''
 def send_format_strings(data: json, filepath):
-    global crashed
+    global crashed, kill
     keys = data.keys()
 
     for keyValue in keys:
@@ -355,7 +363,7 @@ def send_format_strings(data: json, filepath):
                 
                 d[keyValue] = format_string
 
-                if crashed: return
+                if crashed or kill: return
                 if send_to_process(d, filepath):
                     crashed = True
                     return
