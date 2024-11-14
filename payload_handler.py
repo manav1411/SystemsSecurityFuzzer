@@ -1,6 +1,7 @@
 import subprocess
 from utils import *
 import time
+import os
 import subprocess
 from utils import *
 import time
@@ -20,7 +21,7 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
                 input=payload,
                 capture_output=True
             )
-        else: 
+        else:
             process = subprocess.run(
                 [filepath],
                 input=payload,
@@ -48,17 +49,8 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
 Handles logging information when a binary does crash
 '''
 def handle_logging(payload, filepath, code, num_paths, ptime):
-    output_file = './logs/log_' + filepath[11:] + '.txt'
-    # Creates directories for output the first time it's called
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    output_file = './logs.txt'
     if code != 0:
-        with open(output_file, 'w') as file:
-            file.write(f'''
-Binary: {filepath[11:]}
-Program Exited with: {code} | {get_signal(code)}
-Number of Paths Found: {num_paths}
-Total time Taken: {ptime}''')
-            file.close()
         if isinstance(payload, bytes):
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
             # Creates directories for output the first time it's called
@@ -73,14 +65,14 @@ Total time Taken: {ptime}''')
             with open(bad, 'w') as badfile:
                 badfile.write(payload)
                 badfile.close()
-    else:
-        with open(output_file, 'w') as file:
-            file.write(f'''
+        
+    with open(output_file, 'a') as file:
+        file.write(f'''
 Binary: {filepath[11:]}
-Program Exited with: Normal Exit (No Crash)
+Program Exited with: {code} | {get_signal(code)}
 Number of Paths Found: {num_paths}
 Total time Taken: {ptime}''')
-            file.close()
+        file.close()
 
 '''
 Returns a string about which signal was received that wasnt 0
@@ -98,6 +90,7 @@ def get_signal(code):
     elif code == signal.SIGSEGV or code == -11: return "SIGSEGV - Segfault Detected (Invalid Memory Reference.)"
     elif code == signal.SIGTERM or code == -15: return "SIGTERM - Termination Signal"
     elif code == signal.SIGUSR2 or code == -12: return "SIGUSR2 - User Defined Signal (Unknown)"
+    elif code == 0: return "Normal Return (No Crash)"
     else: return "Unknown Signal Received"
 
 '''
@@ -107,10 +100,6 @@ def check_start_output(o, paths):
     if len(o) == 0: return False
     length = 10 if len(o) > 10 else len(o) / 2
     for path in paths:
-        if isinstance(o, bytes):
-            if o[:length].encode() in path:
-                return True
-        else:
-            if o[:length] in path:
-                return True
+        if o[:length] in path:
+            return True
     return False

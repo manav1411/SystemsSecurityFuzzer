@@ -11,7 +11,7 @@ from payload_handler import *
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = True
+SEE_INPUTS = False
 SEE_OUTPUTS = False
 MAX_THREADS = 5
 TIMEOUT_SECONDS = 60
@@ -177,6 +177,7 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 0)))
     threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
+    threads.append(threading.Thread(target=test_empty_cells, args=(data, filepath)))
 
 '''
 Continously runs threads until the program crashes or there
@@ -437,6 +438,48 @@ def send_format_strings(data: list, filepath):
                         if send_to_process(d, filepath):
                             crashed = True
                             return
+
+def test_empty_cells(data: list, filepath):
+    global crashed, kill
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+
+                del d[i][j]
+
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+    
+    if width > 1:
+        for i in range(0, height):
+                for j in range (0, width-1):
+                    d = copy.deepcopy(data)
+
+                    del d[i][j]
+                    del d[i][j]
+
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
+    
+    if height > 1: 
+        for i in range(0, height-1):
+                for j in range (0, width):
+                    d = copy.deepcopy(data)
+
+                    del d[i][j]
+                    del d[i+1][j]
+
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
 
 '''
 Replaces a random value with another random value
