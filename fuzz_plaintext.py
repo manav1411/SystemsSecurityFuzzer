@@ -11,9 +11,9 @@ from payload_handler import *
 '''
 Switch to True if you want to see the inputs being send to the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
 SEE_OUTPUTS = False
-MAX_THREADS = 5
+MAX_THREADS = 10
 TIMEOUT_SECONDS = 60
 
 format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
@@ -43,10 +43,17 @@ threads = []
 Sends a given input to a process, then returns whether the process crashes or not
 '''
 def send_to_process(payload, filepath):
-    pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+    # Sends the input as both text and bytes
+    if isinstance(payload, bytes):
+        pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+        p2crashed, poutput, pcode = send_payload(payload.strip().decode(), filepath, SEE_INPUTS, SEE_OUTPUTS)
+    else:
+        pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+        p2crashed, poutput, pcode = send_payload(payload.encode(), filepath, SEE_INPUTS, SEE_OUTPUTS)
 
     global crashed, kill
-    crashed = pcrashed
+    if p2crashed or pcrashed:
+        crashed = True
 
     if kill:
         return False
@@ -58,7 +65,7 @@ def send_to_process(payload, filepath):
         return True
 
     # If a new output is found it is added to the queue
-    if poutput not in found_paths and not check_start_output(poutput, found_paths):
+    if poutput not in found_paths:
         found_paths.append(poutput)
         add_to_thread_queue(filepath, payload)
 
@@ -68,10 +75,11 @@ def send_to_process(payload, filepath):
 Main function call to begin fuzzing Plaintext input binaries
 '''
 def fuzz_plaintext(filepath, words):
+    w = words.decode()
     global start
     start = time.time()
 
-    send_to_process(words, filepath)
+    send_to_process(w, filepath)
     
     if perform_mutation():
         print_crash_found()
@@ -85,17 +93,15 @@ Adds a given payloads threads to the queue
 '''
 def add_to_thread_queue(filepath, data):
     global threads
-    threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
-    threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
     threads.append(threading.Thread(target=flip_bits, args=(filepath, data)))
     threads.append(threading.Thread(target=add_random_bytes, args=(filepath, data, 0)))
     threads.append(threading.Thread(target=add_random_bytes, args=(filepath, data, 50)))
     threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 0)))
-    threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 500)))
     threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 0)))
-    threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 500)))
     threads.append(threading.Thread(target=send_massive, args=(filepath, )))
     threads.append(threading.Thread(target=send_format_strings, args=(filepath, )))
+    threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
+    threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
 
 '''
 Continously runs threads until the program crashes or there
@@ -123,7 +129,6 @@ Using the defined wordlist we send a significant ammount of varying inputs
 '''
 def send_wordlist_number(filepath):
     global crashed, kill
-    print('> Sending Wordlist allnumber')
     with open('./wordlists/allnumber.txt', 'r') as file:
         for line in file:
             if crashed or kill: 
@@ -134,14 +139,11 @@ def send_wordlist_number(filepath):
                 crashed = True
                 return
             
-    print("- Finished Sending All Numbers")
-
 '''
 Using the defined wordlist we send a significant ammount of varying inputs
 '''
 def send_wordlist_naughty(filepath):
     global crashed, kill
-    print("> Sending wordlist naughtystrings")
     with open('./wordlists/naughtystrings.txt', 'r') as file:
         for line in file:
             if crashed or kill: 
@@ -152,14 +154,11 @@ def send_wordlist_naughty(filepath):
                 crashed = True
                 return
             
-    print("- Finished Sending All Strings")
-
 '''
 Sends the original payload but with random bits flipped
 '''
 def flip_bits(filepath, data):
     global crashed, kill
-    print("> Flipping bits")
     for num in range(0, len(data) * 50):
         d = copy.deepcopy(data)
         flipped = uflip_bits_random(ustring_to_bits(str(d)))
@@ -167,74 +166,78 @@ def flip_bits(filepath, data):
         if send_to_process(ubits_to_string(flipped), filepath):
             crashed = True
             return
-    print("- Finished Bit Flipping")
 
 '''
 Inserts random bytes into the original payload
 '''
 def add_random_bytes(filepath, data, start):
     global crashed, kill
-    print("> Adding in random bytes")
     for _ in range(start, start + 50): # TODO: Increased this because it crashes plaintext3 sometimes
         for num in range(1, 51):
             d = copy.deepcopy(data)
             with_random = uadd_random_bytes(d, num)
             if crashed or kill: return
-            if send_to_process(str(with_random), filepath) or send_to_process(with_random, filepath):
+            if send_to_process(with_random, filepath):
                 crashed = True
                 return
-    print("- Finished Random Bytes")
 
 '''
 Adds a random long string (ASCII) to the end of the current payload
 '''
 def add_long_strings_ascii(filepath, data, start):
     global crashed, kill
-    print("> Adding in long strings (ASCII)")
-    for num in range(start, start + 500):
+    for num in range(start, start + 250):
         d = copy.deepcopy(data)
-        longdata = d + ((random.choice(string.ascii_letters).encode() * num))
+        longdata = d + ((random.choice(string.ascii_letters) * num))
         if crashed or kill: return
-        if send_to_process(str(longdata), filepath) or send_to_process(longdata, filepath):
+        if send_to_process(longdata, filepath):
             crashed = True
             return
-    print(f"- Finished Long Strings ASCII (Start = {start})")
 
 '''
 Adds a random long string (Printable) to the end of the current payload
 '''
 def add_long_strings_printable(filepath, data, start):
     global crashed, kill
-    print("> Adding in long strings (Printable)")
-    for num in range(start, start + 500):
+    for num in range(start, start + 250):
         d = copy.deepcopy(data)
-        longdata = d + (random.choice(string.printable).encode() * num)
+        longdata = d + (random.choice(string.printable) * num)
         if crashed or kill: return
-        if send_to_process(str(longdata), filepath) or send_to_process(longdata, filepath):
+        if send_to_process(longdata, filepath):
             crashed = True
             return
-    print(f"- Finished Long Strings Printable (Start = {start})")
 
 '''
 Sends a couple massive strings
 '''
 def send_massive(filepath):
     global crashed, kill
-    print("> Sending Massive Strings")
     for num in range(1, 101):
         massive = b'A' * (1000 * num)
         if crashed or kill: return
-        if send_to_process(str(massive), filepath) or send_to_process(massive, filepath):
+        if send_to_process(massive, filepath):
             crashed = True
             return
-    print("- Finished Sending Massive")
+    
+    for num in range(1, 101):
+        massive = b'\x00' * (1000 * num)
+        if crashed or kill: return
+        if send_to_process(massive, filepath):
+            crashed = True
+            return
+    
+    for num in range(1, 101):
+        massive = b'\xFF' * (1000 * num)
+        if crashed or kill: return
+        if send_to_process(massive, filepath):
+            crashed = True
+            return
 
 '''
 Generates a list of format strings using specifiers and a given 'index' to use that specifier on
 '''
 def send_format_strings(filepath):
     global crashed, kill
-    print("> Sending Format String Payloads")
     for num in range(0, 51):
         for format_spec in format_string_specifiers:
             if num == 0:
@@ -246,14 +249,12 @@ def send_format_strings(filepath):
             if send_to_process(format_string, filepath):
                 crashed = True
                 return
-    print("- Finished Sending Format Strings")
 
 '''
 Inserts all ASCII control characters into a random position in the string a certain number of times
 '''
 def insert_ascii_control(filepath, data):
     global crashed, kill
-    print("Sending ASCII Control Within Strings")
     for control in ascii_controls:
         for num in range(0, 10):
             d = copy.deepcopy(data)
@@ -262,7 +263,6 @@ def insert_ascii_control(filepath, data):
             if send_to_process(str(new), filepath) or send_to_process(new, filepath):
                 crashed = True
                 return
-    print("- Finshed Sending ASCII Controls")
 
 '''
 Helper
@@ -270,11 +270,13 @@ Helper
 def uadd_random_bytes(s, num_bytes):
     random_bytes = os.urandom(num_bytes)
     index = random.randint(0, len(s))
-    return s[:index] + random_bytes + s[index:]
+    b = s.encode()
+    return b[:index] + random_bytes + b[index:]
 
 '''
 Helper
 '''
 def insert_random_character(s, c):
     index = random.randint(0, len(s))
-    return s[:index] + bytes(c) + s[index:]
+    b = s.encode()
+    return b[:index].encode() + bytes(c) + b[index:].encode()
