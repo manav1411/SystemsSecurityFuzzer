@@ -72,20 +72,9 @@ class ELF:
         print(f"Modified ELF saved at {self.filepath}")
 
 
-def is_elf(file_path):
-    try:
-        with open(file_path, 'rb') as file:
-            elf = ELFFile(file)
-
-            magic = elf.header['e_ident']
-
-            # Check if the magic number matches the ELF signature (0x7f, 'E', 'L', 'F')
-            if magic[:4] == b'\x7fELF':
-                return True
-            else:
-                return False
-    except Exception as e:
-        return False
+def is_elf(words):
+    """Check if the input is an ELF file."""
+    return words[:4] == b'\x7fELF'
 
 
 def send_to_process(payload, filepath):
