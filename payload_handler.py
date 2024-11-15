@@ -4,11 +4,8 @@ import time
 import signal
 import os
 import subprocess
+from utils import *
 import time
-import os
-import subprocess
-import time
-import os
 
 '''
 Sends a given input to a process, then returns whether the process crashes or not
