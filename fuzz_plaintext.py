@@ -2,7 +2,6 @@ import copy
 import os
 import string
 import random
-import subprocess
 import time
 import threading
 from utils import *
@@ -13,6 +12,10 @@ Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
 SEE_OUTPUTS = False
+
+'''
+Global constants (threading-related)
+'''
 MAX_THREADS = 8
 TIMEOUT_SECONDS = 60
 

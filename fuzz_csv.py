@@ -12,8 +12,12 @@ from payload_handler import *
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = True
+SEE_INPUTS = False
 SEE_OUTPUTS = False
+
+'''
+Global constants (threading-related)
+'''
 MAX_THREADS = 8
 TIMEOUT_SECONDS = 60
 
