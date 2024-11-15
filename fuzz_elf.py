@@ -1,6 +1,9 @@
 import copy
 import string
 import random
+import os
+import string
+import random
 import time
 import threading
 from utils import *
@@ -13,8 +16,10 @@ SEE_OUTPUTS = False
 MAX_THREADS = 5
 TIMEOUT_SECONDS = 60
 
-# Format specifiers and control characters as before
+# Format specifiers to target potential format string vulnerabilities
 format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
+
+# Control characters to insert and potentially trigger unexpected behavior
 ascii_controls = ['\x00', '\x01', '\x02', '\x03', '\x04', '\x05', '\x06', '\x07', '\x08',
                   '\x09', '\x0a', '\x0b', '\x0c', '\x0d', '\x0e', '\x0f', '\x10', '\x11',
                   '\x12', '\x13', '\x14', '\x15', '\x16', '\x17', '\x18', '\x19', '\x1a',
@@ -271,7 +276,6 @@ def add_long_strings_printable(filepath, data, start):
             crashed = True
             return
     print(f"- Finished Long Strings Printable (Start = {start})")
-
 
 def send_massive(filepath):
     global crashed, kill
