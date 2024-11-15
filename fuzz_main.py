@@ -48,7 +48,7 @@ def fuzz(file, input):
     elif fuzz_pdf.is_pdf(words):
         print("Found pdf Input  > Fuzzing")
         fuzz_pdf.fuzz_pdf(filepath, words)
-    elif fuzz_csv.is_elf(inputpath):
+    elif fuzz_elf.is_elf(inputpath):
         print("Found ELF Input  > Fuzzing")
         fuzz_csv.fuzz_csv(filepath, words)
     elif fuzz_csv.is_csv(words.decode("utf-8")):
