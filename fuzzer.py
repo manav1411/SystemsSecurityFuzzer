@@ -1,7 +1,6 @@
 import fuzz_main
 from utils import print_line
 import sys
-import threading
 import multiprocessing
 from os import listdir
 from os.path import isfile, join

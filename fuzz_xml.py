@@ -1,12 +1,10 @@
 import xml.etree.ElementTree as ET
 from utils import *
-import subprocess
 import time
 import copy
 import random
 import json
 from payload_handler import *
-import threading
 
 '''
 Switch to True if you want to see the inputs being send to the binary + outputs returned
