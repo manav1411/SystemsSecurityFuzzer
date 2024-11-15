@@ -52,11 +52,15 @@ def handle_logging(payload, filepath, code, num_paths, ptime):
     if code != 0:
         if isinstance(payload, bytes):
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            # Creates directories for output the first time it's called
+            os.makedirs(os.path.dirname(bad), exist_ok=True)
             with open(bad, 'wb') as badfile:
                 badfile.write(payload)
                 badfile.close()
         else:
             bad = './fuzzer_output/bad_' + filepath[11:] + '.txt'
+            # Creates directories for output the first time it's called
+            os.makedirs(os.path.dirname(bad), exist_ok=True)
             with open(bad, 'w') as badfile:
                 badfile.write(payload)
                 badfile.close()
