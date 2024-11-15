@@ -2,7 +2,6 @@ import fuzz_json
 import fuzz_csv
 import fuzz_jpeg
 import fuzz_plaintext
-import fuzz_elf
 import fuzz_xml
 import fuzz_pdf
 import os
@@ -39,21 +38,18 @@ def fuzz(file, input):
     if fuzz_json.is_json(words):
         print("Found JSON Input > Fuzzing")
         fuzz_json.fuzz_json(filepath, words)
-    elif fuzz_elf.is_elf(filepath):
-        print("Found ELF Input > Fuzzing")
-        fuzz_elf.fuzz_elf(filepath, words)
     elif fuzz_jpeg.is_jpeg(words):
         print("Found JPEG Input > Fuzzing")
         fuzz_jpeg.fuzz_jpeg(filepath, words)
     elif fuzz_xml.is_xml(inputpath):
         print("Found XML Input  > Fuzzing")
         fuzz_xml.fuzz_xml(filepath, inputpath)
+    elif fuzz_pdf.is_pdf(words):
+        print("Found pdf Input  > Fuzzing")
+        fuzz_pdf.fuzz_pdf(filepath, words)
     elif fuzz_csv.is_csv(words.decode("utf-8")):
         print("Found CSV Input  > Fuzzing")
         fuzz_csv.fuzz_csv(filepath, words.decode("utf-8"))
-    elif fuzz_pdf.is_pdf(words.decode("utf-8")):
-        print("Found pdf Input  > Fuzzing")
-        fuzz_pdf.fuzz_pdf(filepath, words.decode("utf-8"))
     else:
         print("No Input Type Detected, Assuming Plaintext Input > Fuzzing")
         fuzz_plaintext.fuzz_plaintext(filepath, words)
