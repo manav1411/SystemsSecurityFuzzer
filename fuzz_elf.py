@@ -106,8 +106,6 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
     threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
     threads.append(threading.Thread(target=flip_bits, args=(filepath, data)))
-    threads.append(threading.Thread(target=add_random_bytes, args=(filepath, data, 0)))
-    threads.append(threading.Thread(target=add_random_bytes, args=(filepath, data, 50)))
     threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 0)))
     threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 500)))
     threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 0)))
@@ -116,7 +114,6 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=send_format_strings, args=(filepath, )))
     threads.append(threading.Thread(target=add_extra_data_section, args=(filepath, data)))  # New
     threads.append(threading.Thread(target=modify_elf_header, args=(filepath, )))           # New
-    threads.append(threading.Thread(target=modify_symbols, args=(filepath, )))             # New
     threads.append(threading.Thread(target=change_readonly_constants, args=(filepath, )))  # New
 
 def perform_mutation(filepath, data):
