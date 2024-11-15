@@ -17,7 +17,7 @@ SEE_OUTPUTS = False
 '''
 Global constants (threading-related)
 '''
-MAX_THREADS = 5
+MAX_THREADS = 8
 TIMEOUT_SECONDS = 60
 
 '''
@@ -67,7 +67,8 @@ def send_to_process(payload, filepath, payload_is_tree=True):
     pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
 
     global crashed, kill
-    crashed = pcrashed
+    if pcrashed:
+        crashed = pcrashed
 
     if kill:
         return False
