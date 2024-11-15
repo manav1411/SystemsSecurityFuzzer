@@ -5,3 +5,4 @@ core
 .history/
 out
 .DS_Store
+.vscode/
