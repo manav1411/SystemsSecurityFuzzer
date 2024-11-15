@@ -47,16 +47,15 @@ void parse_elf(const char *filename) {
                sizeof(Elf64_Shdr));
 
         fseek(file, section_header.sh_name, SEEK_SET);
-        char section_name[256];  // Arbitrary size; vulnerable to overflow
+        char section_name[20];
         if (fread(section_name, 1, 255, file) < 0) {
             perror("Failed to read section name");
             fclose(file);
             exit(1);
         }
-        section_name[255] = '\0';  // Null-terminate
+        // No null terminator; potential buffer overflow
 
-        // Print the section name (dangerous, might overflow the buffer)
-        printf("Section %d: %s\n", i, section_name);
+        printf(section_name);
     }
 
     fclose(file);
