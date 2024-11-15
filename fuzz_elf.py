@@ -325,23 +325,3 @@ def modify_elf_with_format_string(filepath, format_string):
     elf.add_format_string(format_string)
     return elf.save()
 
-
-def insert_ascii_control(filepath, data):
-    global crashed, kill
-    print("Sending ASCII Control Within Strings")
-    for control in ascii_controls:
-        for num in range(0, 10):
-            d = copy.deepcopy(data)
-            new = insert_random_character(d, control)
-            elf_payload = modify_elf_with_control_chars(filepath, new)
-            if crashed or kill: return
-            if send_to_process(elf_payload, filepath):
-                crashed = True
-                return
-    print("- Finished Sending ASCII Controls")
-
-def modify_elf_with_control_chars(filepath, data_with_control):
-    # Ensure control characters are inserted without breaking ELF format
-    elf = ELF(filepath)
-    elf.insert_control_chars(data_with_control)
-    return elf.save()
