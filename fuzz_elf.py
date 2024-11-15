@@ -1,9 +1,6 @@
 import copy
 import string
 import random
-import os
-import string
-import random
 import time
 import threading
 from utils import *
@@ -75,9 +72,21 @@ class ELF:
         print(f"Modified ELF saved at {self.filepath}")
 
 
-def is_elf(filepath):
-    with open(filepath, 'rb') as f:
-        return f.read(4) == b'\x7fELF'
+def is_elf(file_path):
+    try:
+        with open(file_path, 'rb') as file:
+            elf = ELFFile(file)
+
+            magic = elf.header['e_ident']
+
+            # Check if the magic number matches the ELF signature (0x7f, 'E', 'L', 'F')
+            if magic[:4] == b'\x7fELF':
+                return True
+            else:
+                return False
+    except Exception as e:
+        return False
+
 
 def send_to_process(payload, filepath):
     pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
