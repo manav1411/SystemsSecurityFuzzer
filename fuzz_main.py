@@ -2,10 +2,7 @@ import fuzz_json
 import fuzz_csv
 import fuzz_jpeg
 import fuzz_plaintext
-import fuzz_xml
-import fuzz_pdf
 import fuzz_elf
-import os
 
 # ANSI colors
 RESET = "\033[0m"
