@@ -5,15 +5,16 @@ import random
 import string
 import time
 import threading
+import req
 from utils import *
 from payload_handler import *
 
 '''
 Switch to True if you want to see the inputs / outputs being send to / received from the binary
 '''
-SEE_INPUTS = False
+SEE_INPUTS = True
 SEE_OUTPUTS = False
-MAX_THREADS = 5
+MAX_THREADS = 8
 TIMEOUT_SECONDS = 60
 
 '''
@@ -103,7 +104,8 @@ def send_to_process(payload, filepath):
     _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
     global crashed, kill
-    crashed = _crashed
+    if _crashed:
+        crashed = _crashed
 
     if kill:
         return False
@@ -121,13 +123,39 @@ def send_to_process(payload, filepath):
 
     return False
 
+'''
+'''
+def rsend_to_process(payload, filepath):
+    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
+    
+    global crashed, kill
+    if _crashed:
+        crashed = _crashed
+
+    if kill:
+        return False
+
+    # Handles the program logging if it crashes
+    if crashed:
+        global start
+        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
+        return True
+
+    # If a new output is found it is added to the queue
+    if _output not in found_paths:
+        found_paths.append(_output)
+        add_to_thread_queue(filepath, payload)
+
+    return False
+
 ''' New Delim Version '''
 def send_to_process_newdelim(payload, filepath, delim):
     p = list_to_csv(payload, delim)
     _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
     global crashed, kill
-    crashed = _crashed
+    if _crashed:
+        crashed = _crashed
 
     if kill:
         return False
@@ -173,11 +201,11 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=mutate_data_ints, args=(data, filepath)))
     threads.append(threading.Thread(target=mutate_data_values_with_delimiters, args=(data, filepath)))
     threads.append(threading.Thread(target=mutate_delimiters, args=(data, filepath)))
-    threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 50)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 0)))
-    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 500)))
+    threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 10)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
     threads.append(threading.Thread(target=test_empty_cells, args=(data, filepath)))
+    threads.append(threading.Thread(target=add_random_bytes, args=(data, filepath)))
+    threads.append(threading.Thread(target=add_bytes_sequential, args=(data, filepath)))
 
 '''
 Continously runs threads until the program crashes or there
@@ -317,6 +345,11 @@ def mutate_delimiters(data: list, filepath):
         if send_to_process_newdelim(d, filepath, delim):
             crashed = True
             return
+    d = req.getPay()
+    if crashed or kill: return
+    if rsend_to_process(d, filepath):
+        crashed = True
+        return
 
 '''
 Flips bits of the values contained within the CSV
@@ -341,7 +374,6 @@ def flip_bits(data: list, filepath, numflips):
                     back_to_string = ubits_to_string(flipped)
 
                     d[i][j] = back_to_string
-
                     
                     if crashed or kill: return
                     if send_to_process(d, filepath):
@@ -439,6 +471,9 @@ def send_format_strings(data: list, filepath):
                             crashed = True
                             return
 
+'''
+Tests emptying random cells within the CSV
+'''
 def test_empty_cells(data: list, filepath):
     global crashed, kill
     width = len(data[0])
@@ -480,6 +515,64 @@ def test_empty_cells(data: list, filepath):
                     if send_to_process(d, filepath):
                         crashed = True
                         return
+
+'''
+Adds random bytes to the elements of the CSV
+'''
+def add_random_bytes(data: list, filepath):
+    global crashed, kill
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+        for j in range(0, width):
+            for nunm in range(1, 11):
+                for _ in range(1, 11):
+                    d = copy.deepcopy(data)
+                    d[i][j] = uadd_random_bytes(d[i][j], _)
+
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
+
+'''
+Sequentially adds bytes throughout the object
+'''
+def add_bytes_sequential(data: list, filepath):
+    global crashed, kill
+    width = len(data[0])
+    height = len(data)
+
+    for i in range(0, height):
+        for j in range(0, width):
+            for _ in range(0, len(data[i][j])):
+                d = copy.deepcopy(data)
+                d[i][j] = replace_byte_at(d[i][j], _, b"'")
+
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+            
+            for _ in range(0, len(data[i][j])):
+                d = copy.deepcopy(data)
+                d[i][j] = replace_byte_at(d[i][j], _, b"\xFF")
+
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+            
+            for _ in range(0, len(data[i][j])):
+                d = copy.deepcopy(data)
+                d[i][j] = replace_byte_at(d[i][j], _, b"\x00")
+
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+
 
 '''
 Replaces a random value with another random value

@@ -9,7 +9,7 @@ Switch to True if you want to see the inputs being send to the binary
 '''
 SEE_INPUTS = False
 SEE_OUTPUTS = False
-MAX_THREADS = 5
+MAX_THREADS = 8
 TIMEOUT_SECONDS = 60
 
 '''
@@ -99,7 +99,8 @@ def send_to_process(payload, filepath):
     _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
     global crashed, kill
-    crashed = _crashed
+    if _crashed:
+        crashed = _crashed
 
     if kill:
         return False

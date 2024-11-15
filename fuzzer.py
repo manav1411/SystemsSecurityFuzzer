@@ -22,14 +22,16 @@ if __name__ == "__main__":
         print_line()
 
         binaries = [f for f in listdir("./binaries") if isfile(join("./binaries", f))]
+        print(binaries)
 
         for i in range(0, len(binaries)):
-            # main.fuzz(binaries[i], binaries[i] + ".txt")
+            #fuzz_main.fuzz(binaries[i], binaries[i] + ".txt")
             programs.append(multiprocessing.Process(target=fuzz_main.fuzz, args=(binaries[i], binaries[i] + ".txt")))
 
         while len(programs) > 0 or active_children:
             active_children = len(multiprocessing.active_children())
             if active_children >= MAX_CORES:
                 continue
-            run = programs.pop()
-            run.start()
+            if len(programs) > 0:
+                run = programs.pop()
+                run.start()
