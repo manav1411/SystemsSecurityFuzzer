@@ -6,6 +6,7 @@ import threading
 from utils import *
 from payload_handler import *
 from elftools.elf.elffile import ELFFile
+from pwn import asm
 
 SEE_INPUTS = False
 SEE_OUTPUTS = False
@@ -138,8 +139,20 @@ def add_extra_data_section(filepath, data):
     print("> Adding extra data section to ELF")
     with open(filepath, 'r+b') as f:
         elf = ELFFile(f)
-        new_section_name = ".new_section"
-        new_section_data = b"\x90\x90\x90\x90"  # NOP sled for example
+        new_section_name = ".win"
+        new_section_data = asm("""
+            xor rax, rax
+            push rax
+            mov rax, 0x68732f2f6e69622f
+            push rax
+            mov rdi, rsp
+
+            xor rsi, rsi
+            xor rdx, rdx
+            mov rax, 59
+            syscall
+            """, arch='amd64')
+
         elf.add_section(new_section_name, new_section_data)
         f.seek(0)
         elf.write(f)
@@ -273,7 +286,6 @@ def send_massive(filepath):
     print("- Finished Sending Massive")
 
 def modify_elf_with_large_data(filepath, large_data):
-    # Add large data to ELF without breaking the format
     elf = ELF(filepath)
     elf.add_data_to_section(large_data)
     return elf.save()
@@ -296,8 +308,7 @@ def send_format_strings(filepath):
     print("- Finished Sending Format Strings")
 
 def modify_elf_with_format_string(filepath, format_string):
-    # Inject format string into the ELF file
+    """ Inject format string into the ELF file """
     elf = ELF(filepath)
     elf.add_format_string(format_string)
     return elf.save()
-

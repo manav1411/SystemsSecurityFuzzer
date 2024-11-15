@@ -1,7 +1,7 @@
-#include <elf.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <elf.h>
 
 #define MAX_BUF_SIZE 256  // Arbitrary buffer size that can be overflowed
 
