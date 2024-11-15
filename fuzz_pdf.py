@@ -1,9 +1,11 @@
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 import copy
 import random
 import os
 import threading
 import time
+from payload_handler import *
+from utils import *
 
 # Configuration options
 SEE_INPUTS = False
@@ -24,10 +26,14 @@ Returns whether the given data is a valid PDF or not
 '''
 def is_pdf(words):
     try:
-        PdfReader(words)
+        print("trying pdf")
+
+        # test if first few characters in given data are %PDF
+        if words[:4] == b"%PDF":
+            return True
     except Exception:
         return False
-    return True
+    return False
 
 '''
 Sends a given input to a process and returns whether it crashes
@@ -35,20 +41,38 @@ Sends a given input to a process and returns whether it crashes
 def send_to_process(payload, filepath):
     global crashed, kill
     temp_file = "./temp_fuzzed.pdf"
-    with open(temp_file, "wb") as f:
-        f.write(payload)
 
-    crashed, poutput, pcode = send_payload(temp_file, filepath, SEE_INPUTS, SEE_OUTPUTS)
+    try:
+        # Create the temp file
+        with open(temp_file, "wb") as f:
+            f.write(payload)
 
-    if crashed:
-        handle_logging(payload, filepath, pcode, len(found_paths), time.time() - start)
-        return True
-    elif poutput not in found_paths:
-        found_paths.append(poutput)
-        add_to_thread_queue(filepath, payload)
+        # Send the temp file to the process (e.g., running the binary with the mutated PDF)
+        crashed, poutput, pcode = send_payload(temp_file, filepath, SEE_INPUTS, SEE_OUTPUTS)
 
-    os.remove(temp_file)
+        if crashed:
+            # If the process crashes, log the details
+            handle_logging(payload, filepath, pcode, len(found_paths), time.time() - start)
+
+            # Cleanup: only remove the temp file if it exists
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            return True
+        elif poutput not in found_paths:
+            # If we get a new output, add it to the queue for further fuzzing
+            found_paths.append(poutput)
+            add_to_thread_queue(filepath, payload)
+
+    except Exception as e:
+        print(f"Error occurred while processing the temporary file: {e}")
+        return False
+
+    # Cleanup: only remove the temp file if it exists
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
+
     return False
+
 
 '''
 Main function call to begin fuzzing PDF input binaries
@@ -171,30 +195,3 @@ def flip_bits_random(data, filepath):
         if send_to_process(bytes(fuzzed_data), filepath):
             crashed = True
             return
-
-'''
-Helper function for logging crashes
-'''
-def handle_logging(payload, filepath, code, num_paths, duration):
-    with open("./log.txt", "a") as log_file:
-        log_file.write(f"Crash detected in {filepath}\n")
-        log_file.write(f"Code: {code}, Paths: {num_paths}, Duration: {duration}\n")
-        log_file.write(f"Payload: {payload}\n")
-
-'''
-Helper function for process output
-'''
-def send_payload(data, filepath, see_inputs, see_outputs):
-    # Dummy implementation - Replace with your binary testing logic
-    if see_inputs:
-        print(f"Input: {data[:50]}...")
-    return False, "Output", 0
-
-'''
-Helper printing methods
-'''
-def print_crash_found():
-    print("Crash detected! Check log.txt for details.")
-
-def print_no_crash_found():
-    print("No crashes found. Fuzzing complete.")

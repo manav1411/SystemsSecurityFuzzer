@@ -48,12 +48,12 @@ def fuzz(file, input):
     elif fuzz_xml.is_xml(inputpath):
         print("Found XML Input  > Fuzzing")
         fuzz_xml.fuzz_xml(filepath, inputpath)
+    elif fuzz_pdf.is_pdf(words):
+        print("Found pdf Input  > Fuzzing")
+        fuzz_pdf.fuzz_pdf(filepath, words)
     elif fuzz_csv.is_csv(words.decode("utf-8")):
         print("Found CSV Input  > Fuzzing")
         fuzz_csv.fuzz_csv(filepath, words.decode("utf-8"))
-    elif fuzz_pdf.is_pdf(words.decode("utf-8")):
-        print("Found pdf Input  > Fuzzing")
-        fuzz_pdf.fuzz_pdf(filepath, words.decode("utf-8"))
     else:
         print("No Input Type Detected, Assuming Plaintext Input > Fuzzing")
         fuzz_plaintext.fuzz_plaintext(filepath, words)
