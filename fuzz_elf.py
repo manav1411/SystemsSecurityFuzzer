@@ -230,27 +230,6 @@ def modify_elf_with_flipped_bits(filepath, flipped_bits):
     return elf.save()
 
 
-def add_random_bytes(filepath, data, start):
-    global crashed, kill
-    print("> Adding in random bytes")
-    for _ in range(start, start + 50):
-        for num in range(1, 51):
-            d = copy.deepcopy(data)
-            with_random = uadd_random_bytes(d, num)
-            elf_payload = modify_elf_with_random_bytes(filepath, with_random)
-            if crashed or kill: return
-            if send_to_process(elf_payload, filepath):
-                crashed = True
-                return
-    print("- Finished Random Bytes")
-
-def modify_elf_with_random_bytes(filepath, random_data):
-    # Add random bytes while ensuring the ELF format is maintained
-    elf = ELF(filepath)
-    elf.add_random_bytes(random_data)
-    return elf.save()
-
-
 def add_long_strings_ascii(filepath, data, start):
     global crashed, kill
     print("> Adding in long strings (ASCII)")
