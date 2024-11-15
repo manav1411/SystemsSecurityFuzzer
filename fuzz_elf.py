@@ -28,6 +28,10 @@ crashed = False
 kill = False
 threads = []
 
+def is_elf(filepath):
+    with open(filepath, 'rb') as f:
+        return f.read(4) == b'\x7fELF'
+
 def send_to_process(payload, filepath):
     pcrashed, poutput, pcode = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
 
@@ -48,7 +52,7 @@ def send_to_process(payload, filepath):
 
     return False
 
-def fuzz_plaintext(filepath, words):
+def fuzz_elf(filepath, words):
     global start
     start = time.time()
 
