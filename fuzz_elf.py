@@ -28,7 +28,7 @@ crashed = False
 kill = False
 threads = []
 
-class ELF:
+class elf_file:
     def __init__(self, filepath):
         self.filepath = filepath
         self.data = self.load_elf()
@@ -49,6 +49,14 @@ class ELF:
                     return section['sh_offset']
         return None  # Not found
 
+
+    def save(self):
+        """Saves the modified ELF file."""
+        with open(self.filepath, 'wb') as f:
+            f.write(self.data)
+        print(f"Modified ELF saved at {self.filepath}")
+
+
     def modify_section_data(self, section_name, data):
         """Modifies the section data."""
         # Find the offset for the section we want to modify
@@ -60,16 +68,8 @@ class ELF:
         # Replace the section data in the ELF file's raw data
         self.data = self.data[:section_offset] + data + self.data[section_offset+len(data):]
         print(f"Section {section_name} modified.")
+        self.save()
 
-    def add_data_to_section(self, section_name, data):
-        """Adds data to an appropriate section in the ELF file."""
-        self.modify_section_data(section_name, data.encode())
-
-    def save(self):
-        """Saves the modified ELF file."""
-        with open(self.filepath, 'wb') as f:
-            f.write(self.data)
-        print(f"Modified ELF saved at {self.filepath}")
 
 
 def is_elf(words):
@@ -92,6 +92,7 @@ def send_to_process(payload, filepath):
         add_to_thread_queue(filepath, payload)
     return False
 
+
 def fuzz_elf(filepath, words):
     global start
     start = time.time()
@@ -105,25 +106,22 @@ def fuzz_elf(filepath, words):
     handle_logging("", filepath, 0, len(found_paths), time.time() - start)
     print_no_crash_found()
 
+
 def add_to_thread_queue(filepath, data):
     global threads
     threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
     threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
     threads.append(threading.Thread(target=flip_bits, args=(filepath, data)))
-    threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 0)))
-    threads.append(threading.Thread(target=add_long_strings_ascii, args=(filepath, data, 500)))
-    threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 0)))
-    threads.append(threading.Thread(target=add_long_strings_printable, args=(filepath, data, 500)))
     threads.append(threading.Thread(target=send_massive, args=(filepath, )))
-    threads.append(threading.Thread(target=send_format_strings, args=(filepath, )))
-    threads.append(threading.Thread(target=add_extra_data_section, args=(filepath, data)))  # New
+    threads.append(threading.Thread(target=add_shellcode, args=(filepath)))  # New
     threads.append(threading.Thread(target=modify_elf_header, args=(filepath, )))           # New
     threads.append(threading.Thread(target=change_readonly_constants, args=(filepath, )))  # New
 
-def perform_mutation(filepath, data):
+
+def perform_mutation():
     global crashed, kill, threads, start
-    while len(threads) > 0 or threading.active_count() > 1:
-        if time.time() - start > TIMEOUT_SECONDS:
+    while (len(threads)) > 0 or threading.active_count() > 1:
+        if (time.time() - start > TIMEOUT_SECONDS):
             print("Timeout - Killing all Threads")
             kill = True
             return False
@@ -138,27 +136,26 @@ def perform_mutation(filepath, data):
     return False
 
 
-def add_extra_data_section(filepath, data):
+def add_shellcode(filepath):
     print("> Adding extra data section to ELF")
-    with open(filepath, 'r+b') as f:
-        elf = ELFFile(f)
-        new_section_name = ".win"
-        new_section_data = asm("""
-            xor rax, rax
-            push rax
-            mov rax, 0x68732f2f6e69622f
-            push rax
-            mov rdi, rsp
 
-            xor rsi, rsi
-            xor rdx, rdx
-            mov rax, 59
-            syscall
-            """, arch='amd64')
+    new_section_name = ".main"
+    shellcode = asm("""
+        xor rax, rax
+        push rax
+        mov rax, 0x68732f2f6e69622f
+        push rax
+        mov rdi, rsp
 
-        elf.add_section(new_section_name, new_section_data)
-        f.seek(0)
-        elf.write(f)
+        xor rsi, rsi
+        xor rdx, rdx
+        mov rax, 59
+        syscall
+        """, arch='amd64')
+
+    e = elf_file(filepath)
+    e.modify_section_data(new_section_name, shellcode)
+
 
 def modify_elf_header(filepath):
     print("> Modifying ELF header")
@@ -181,6 +178,17 @@ def change_readonly_constants(filepath):
         elf.write(f)
 
 
+def modify_elf_with_wordlist(filepath, word):
+    # Add word to data section of ELF, create a valid ELF file
+    elf_data = modify_elf_data_section(filepath, word)
+    return elf_data
+
+def modify_elf_data_section(filepath, data):
+    # Load ELF, append to data section or modify a section with the input data
+    elf = elf_file(filepath)
+    elf.modify_section_data('.data', data)
+
+
 def send_wordlist_number(filepath):
     global crashed, kill
     print('> Sending Wordlist allnumber')
@@ -195,17 +203,6 @@ def send_wordlist_number(filepath):
                 crashed = True
                 return
     print("- Finished Sending All Numbers")
-
-def modify_elf_with_wordlist(filepath, word):
-    # Add word to data section of ELF, create a valid ELF file
-    elf_data = modify_elf_data_section(filepath, word)
-    return elf_data
-
-def modify_elf_data_section(filepath, data):
-    # Load ELF, append to data section or modify a section with the input data
-    elf = ELF(filepath)
-    elf.add_data_to_section(data)
-    return elf.save()
 
 
 def send_wordlist_naughty(filepath):
@@ -223,57 +220,6 @@ def send_wordlist_naughty(filepath):
                 return
     print("- Finished Sending All Strings")
 
-def flip_bits(filepath, data):
-    global crashed, kill
-    print("> Flipping bits")
-    for num in range(0, len(data) * 50):
-        d = copy.deepcopy(data)
-        flipped = uflip_bits_random(ustring_to_bits(str(d)))
-        elf_payload = modify_elf_with_flipped_bits(filepath, flipped)
-        if crashed or kill: return
-        if send_to_process(elf_payload, filepath):
-            crashed = True
-            return
-    print("- Finished Bit Flipping")
-
-def modify_elf_with_flipped_bits(filepath, flipped_bits):
-    # Flip bits in ELF and ensure it's a valid ELF after the operation
-    elf = ELF(filepath)
-    elf.flip_bits(flipped_bits)
-    return elf.save()
-
-
-def add_long_strings_ascii(filepath, data, start):
-    global crashed, kill
-    print("> Adding in long strings (ASCII)")
-    for num in range(start, start + 500):
-        d = copy.deepcopy(data)
-        longdata = d + ((random.choice(string.ascii_letters).encode() * num))
-        elf_payload = modify_elf_with_long_strings(filepath, longdata)
-        if crashed or kill: return
-        if send_to_process(elf_payload, filepath):
-            crashed = True
-            return
-    print(f"- Finished Long Strings ASCII (Start = {start})")
-
-def modify_elf_with_long_strings(filepath, long_string):
-    # Modify ELF with long ASCII strings
-    elf = ELF(filepath)
-    elf.add_string_to_section(long_string)
-    return elf.save()
-
-def add_long_strings_printable(filepath, data, start):
-    global crashed, kill
-    print("> Adding in long strings (Printable)")
-    for num in range(start, start + 500):
-        d = copy.deepcopy(data)
-        longdata = d + (random.choice(string.printable).encode() * num)
-        elf_payload = modify_elf_with_long_strings(filepath, longdata)
-        if crashed or kill: return
-        if send_to_process(elf_payload, filepath):
-            crashed = True
-            return
-    print(f"- Finished Long Strings Printable (Start = {start})")
 
 def send_massive(filepath):
     global crashed, kill
@@ -288,29 +234,5 @@ def send_massive(filepath):
     print("- Finished Sending Massive")
 
 def modify_elf_with_large_data(filepath, large_data):
-    elf = ELF(filepath)
-    elf.add_data_to_section(large_data)
-    return elf.save()
-
-def send_format_strings(filepath):
-    global crashed, kill
-    print("> Sending Format String Payloads")
-    for num in range(0, 51):
-        for format_spec in format_string_specifiers:
-            if num == 0:
-                format_string = f'%{format_spec}'
-            else:
-                format_string = f'%{num}${format_spec}'
-
-            elf_payload = modify_elf_with_format_string(filepath, format_string)
-            if crashed or kill: return
-            if send_to_process(elf_payload, filepath):
-                crashed = True
-                return
-    print("- Finished Sending Format Strings")
-
-def modify_elf_with_format_string(filepath, format_string):
-    """ Inject format string into the ELF file """
-    elf = ELF(filepath)
-    elf.add_format_string(format_string)
-    return elf.save()
+    elf = elf_file(filepath)
+    elf.modify_section_data('.data', large_data)
