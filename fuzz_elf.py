@@ -10,7 +10,7 @@ from pwn import asm
 
 SEE_INPUTS = False
 SEE_OUTPUTS = False
-MAX_THREADS = 5
+MAX_THREADS = 6
 TIMEOUT_SECONDS = 60
 
 # Format specifiers to target potential format string vulnerabilities
@@ -99,7 +99,7 @@ def fuzz_elf(filepath, words):
 
     send_to_process(words, filepath)
 
-    if perform_mutation(filepath, words):
+    if perform_mutation():
         print_crash_found()
         return
 
@@ -111,7 +111,6 @@ def add_to_thread_queue(filepath, data):
     global threads
     threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
     threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
-    threads.append(threading.Thread(target=flip_bits, args=(filepath, data)))
     threads.append(threading.Thread(target=send_massive, args=(filepath, )))
     threads.append(threading.Thread(target=add_shellcode, args=(filepath)))  # New
     threads.append(threading.Thread(target=modify_elf_header, args=(filepath, )))           # New
