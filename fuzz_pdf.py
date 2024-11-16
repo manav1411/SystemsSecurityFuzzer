@@ -40,18 +40,19 @@ Sends a given input to a process and returns whether it crashes
 '''
 def send_to_process(payload, filepath):
     global crashed, kill
-    temp_file = "./temp_fuzzed.pdf"
+    temp_file = "./temp_fuzzed.txt"
 
     try:
-        # Create the temp file
+        # Create the temp file with the PDF data (written as txt)
         with open(temp_file, "wb") as f:
             f.write(payload)
 
-        # Send the temp file to the process (e.g., running the binary with the mutated PDF)
+
+        # Send the temp file to the process
         crashed, poutput, pcode = send_payload(temp_file, filepath, SEE_INPUTS, SEE_OUTPUTS)
 
+
         if crashed:
-            # If the process crashes, log the details
             handle_logging(payload, filepath, pcode, len(found_paths), time.time() - start)
 
             # Cleanup: only remove the temp file if it exists
@@ -59,19 +60,22 @@ def send_to_process(payload, filepath):
                 os.remove(temp_file)
             return True
         elif poutput not in found_paths:
-            # If we get a new output, add it to the queue for further fuzzing
             found_paths.append(poutput)
             add_to_thread_queue(filepath, payload)
 
     except Exception as e:
         print(f"Error occurred while processing the temporary file: {e}")
         return False
-
-    # Cleanup: only remove the temp file if it exists
-    if os.path.exists(temp_file):
-        os.remove(temp_file)
+    finally:
+        # Cleanup the temp file if it exists
+        if os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+            except Exception as cleanup_error:
+                print(f"Error removing temp file: {cleanup_error}")
 
     return False
+
 
 
 '''
@@ -83,6 +87,12 @@ def fuzz_pdf(filepath, words):
 
     # Save the original PDF payload for reference
     send_to_process(words, filepath)
+
+    print("HELLO")
+    # send the original PDF to the process
+    if send_to_process(words, filepath):
+        print_crash_found()
+        return
 
     # Begin mutations
     if perform_mutation(words, filepath):
