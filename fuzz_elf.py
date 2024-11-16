@@ -1,10 +1,9 @@
-import copy
-import string
-import random
+import io
 import time
 import threading
 from utils import *
 from payload_handler import *
+from elftools.elf.elffile import ELFFile
 import pwn
 
 SEE_INPUTS = False
@@ -37,19 +36,18 @@ class elf_file:
         with open(self.filepath, 'rb') as f:
             return f.read()
 
-    def get_section_offset(self, section_name):
-        # Load the ELF file using pwntools
-        # TODO why does an error occur and says magic number does not match?
-        elf = pwn.ELF(self.filepath)
+    def get_section_offset(self, elf_bytes, section_name):
+        # Load the ELF file from bytes
+        elf_file = ELFFile(io.BytesIO(elf_bytes))
 
-        # Check if the section exists
-        if section_name in elf.sections:
-            # Get the section
-            section = elf.get_section_by_name(section_name)
-            return section['sh_offset']
-        else:
-            print(f"Section {section_name} not found.")
-            return None
+        # Iterate over the sections to find the one with the matching name
+        for section in elf_file.iter_sections():
+            if section.name == section_name:
+                # Return the offset of the section
+                return section.header['sh_offset']
+
+        # If the section is not found, return None
+        return None
 
 
     def save(self):
@@ -61,17 +59,18 @@ class elf_file:
 
     def modify_section_data(self, section_name, data):
         """Modifies the section data."""
-        # Find the offset for the section we want to modify
-        section_offset = self.get_section_offset(section_name)
-        if section_offset is None:
-            print(f"Section {section_name} not found.")
-            return
 
-        # Replace the section data in the ELF file's raw data
-        self.data = self.data[:section_offset] + data + self.data[section_offset+len(data):]
-        print(f"Section {section_name} modified.")
-        self.save()
+        with open(self.filepath, 'rb') as f:
+            words = f.read()
+            section_offset = self.get_section_offset(words, section_name)
+            if section_offset is None:
+                print(f"Section {section_name} not found.")
+                return
 
+            # Replace the section data in the ELF file's raw data
+            self.data = self.data[:section_offset] + data + self.data[section_offset+len(data):]
+            print(f"Section {section_name} modified.")
+            self.save()
 
 
 def is_elf(words):
@@ -114,8 +113,7 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=send_wordlist_naughty, args=(filepath, )))
     threads.append(threading.Thread(target=send_wordlist_number, args=(filepath, )))
     threads.append(threading.Thread(target=send_massive, args=(filepath, )))
-    threads.append(threading.Thread(target=add_shellcode, args=(filepath)))  # New
-    threads.append(threading.Thread(target=modify_elf_header, args=(filepath, )))           # New
+    threads.append(threading.Thread(target=add_shellcode, args=(filepath)))  # New     # New
     threads.append(threading.Thread(target=change_readonly_constants, args=(filepath, )))  # New
 
 
@@ -157,13 +155,6 @@ def add_shellcode(filepath):
     e = elf_file(filepath)
     e.modify_section_data(new_section_name, shellcode)
 
-
-def modify_elf_header(filepath):
-    print("> Modifying ELF header")
-
-    with open(filepath, 'r+b') as f:
-        f.seek(0)
-        f.write(p64(0xdeadbeef))
 
 def change_readonly_constants(filepath):
     print("> Changing read-only constants in ELF")
