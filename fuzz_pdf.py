@@ -48,7 +48,9 @@ def send_to_process(payload, filepath):
             f.write(payload)
 
         # Send the temp file to the process (e.g., running the binary with the mutated PDF)
-        crashed, poutput, pcode = send_payload(temp_file, filepath, SEE_INPUTS, SEE_OUTPUTS)
+        # crashed, poutput, pcode = send_payload(temp_file, filepath, SEE_INPUTS, SEE_OUTPUTS)
+        crashed, poutput, pcode = send_payload(f, filepath, SEE_INPUTS, SEE_OUTPUTS)
+        f.close()
 
         if crashed:
             # If the process crashes, log the details
@@ -68,8 +70,8 @@ def send_to_process(payload, filepath):
         return False
 
     # Cleanup: only remove the temp file if it exists
-    if os.path.exists(temp_file):
-        os.remove(temp_file)
+    # if os.path.exists(temp_file):
+    #     os.remove(temp_file)
 
     return False
 
