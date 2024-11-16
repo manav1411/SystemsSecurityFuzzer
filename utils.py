@@ -1,5 +1,5 @@
 import random
-import signal
+import os
 
 '''
 Prints out the progress bar depending on input
@@ -130,6 +130,21 @@ def replace_byte_at(data, index, byte):
         new_data = data[:index] + byte.encode() + data[index + 1:]
         return int.from_bytes(new_data)
     else:
-        new_data = data[:index] + str(byte) + data[index + 1:]    
+        if isinstance(data, bytes):
+            new_data = data[:index] + byte + data[index + 1:]
+        else:
+            new_data = data[:index] + str(byte) + data[index + 1:]
     
     return new_data
+
+'''
+Adds random bytes
+'''
+def uadd_random_bytes(s, num_bytes):
+    random_bytes = os.urandom(num_bytes)
+    index = random.randint(0, len(s))
+    if isinstance(s, bytes):
+        return s[:index] + random_bytes + s[index:]
+    else:
+        b = s.encode()
+        return b[:index] + random_bytes + b[index:]

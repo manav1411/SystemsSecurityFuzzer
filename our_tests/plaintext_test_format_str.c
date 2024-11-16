@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-void vulnerableFunction() {
+void vulnerableFunction(char* input) {
     printf(input); // Vulnerable function
 }
 

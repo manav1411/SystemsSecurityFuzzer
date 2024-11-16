@@ -4,3 +4,5 @@ __pycache__
 core
 .history/
 out
+.DS_Store
+.vscode/
