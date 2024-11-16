@@ -8,6 +8,7 @@ RUN apt-get install -y python3-pypdf
 COPY . /
 ADD binaries /binaries
 ADD example_inputs /example_inputs
+ADD wordlists /wordlists
 RUN chmod +x /binaries/*
 
 # Run it.

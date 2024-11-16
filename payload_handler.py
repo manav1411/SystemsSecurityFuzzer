@@ -19,14 +19,16 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
             process = subprocess.run(
                 [filepath],
                 input=payload,
-                capture_output=True
+                capture_output=True,
+                timeout=10
             )
         else:
             process = subprocess.run(
                 [filepath],
                 input=payload,
                 text=True,
-                capture_output=True
+                capture_output=True,
+                timeout=10
             )
         
         # Capture the return code and output
@@ -36,8 +38,11 @@ def send_payload(payload, filepath, see_inputs, see_outputs):
         if see_outputs:
             print(output)
         
+    except subprocess.TimeoutExpired:
+        return True, "Hang detected", -20
+
     except Exception as e:
-        #print(e)
+        # print(e)
         return False, "", 0
 
     if code != 0:
@@ -87,6 +92,7 @@ def get_signal(code):
     elif code == signal.SIGSEGV or code == -11: return "SIGSEGV - Segfault Detected (Invalid Memory Reference.)"
     elif code == signal.SIGTERM or code == -15: return "SIGTERM - Termination Signal"
     elif code == signal.SIGUSR2 or code == -12: return "SIGUSR2 - User Defined Signal (Unknown)"
+    elif code == -20: return "Hang/Infinite Loop detected"
     elif code == 0: return "Normal Return (No Crash)"
     else: return "Unknown Signal Received"
 
