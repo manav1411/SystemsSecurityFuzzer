@@ -5,8 +5,7 @@ import time
 import threading
 from utils import *
 from payload_handler import *
-from elftools.elf.elffile import ELFFile
-from pwn import asm
+import pwn
 
 SEE_INPUTS = False
 SEE_OUTPUTS = False
@@ -39,15 +38,18 @@ class elf_file:
             return f.read()
 
     def get_section_offset(self, section_name):
-        """Returns the offset of the section in the ELF file."""
-        with open(self.filepath, 'rb') as f:
-            elf = ELFFile(f)
+        # Load the ELF file using pwntools
+        # TODO why does an error occur and says magic number does not match?
+        elf = pwn.ELF(self.filepath)
 
-            for section in elf.iter_sections():
-                if section.name == section_name:
-                    # Return the offset where the section starts in the file
-                    return section['sh_offset']
-        return None  # Not found
+        # Check if the section exists
+        if section_name in elf.sections:
+            # Get the section
+            section = elf.get_section_by_name(section_name)
+            return section['sh_offset']
+        else:
+            print(f"Section {section_name} not found.")
+            return None
 
 
     def save(self):
@@ -139,7 +141,7 @@ def add_shellcode(filepath):
     print("> Adding extra data section to ELF")
 
     new_section_name = ".main"
-    shellcode = asm("""
+    shellcode = pwn.asm("""
         xor rax, rax
         push rax
         mov rax, 0x68732f2f6e69622f
@@ -158,23 +160,18 @@ def add_shellcode(filepath):
 
 def modify_elf_header(filepath):
     print("> Modifying ELF header")
-    with open(filepath, 'r+b') as f:
-        elf = ELFFile(f)
-        header = elf.header
-        header['e_entry'] = 0xdeadbeef  # Change entry point to a new value
-        f.seek(0)
-        elf.write(f)
 
+    with open(filepath, 'r+b') as f:
+        f.seek(0)
+        f.write(p64(0xdeadbeef))
 
 def change_readonly_constants(filepath):
     print("> Changing read-only constants in ELF")
-    with open(filepath, 'r+b') as f:
-        elf = ELFFile(f)
-        rodata_section = elf.get_section_by_name('.rodata')
-        new_constant = b"Super long constant data that could overflow buffers" * 30
-        rodata_section.data = new_constant  # Modify the section's data with a long constant
-        f.seek(0)
-        elf.write(f)
+
+    e = elf_file(filepath)
+    e.modify_section_data(".rodata", b"sbdfuhsdbud")
+    e.modify_section_data(".text", b"sbdfuhsdbud")
+
 
 
 def modify_elf_with_wordlist(filepath, word):
