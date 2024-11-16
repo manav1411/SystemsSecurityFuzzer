@@ -5,12 +5,11 @@ import random
 import string
 import time
 import threading
-import req
 from utils import *
 from payload_handler import *
 
 '''
-Switch to True if you want to see the inputs / outputs being send to / received from the binary
+Switch to True if you want to see the inputs / outputs being sent to / received from the binary
 '''
 SEE_INPUTS = False
 SEE_OUTPUTS = False
@@ -19,20 +18,19 @@ SEE_OUTPUTS = False
 Global constants (threading-related)
 '''
 MAX_THREADS = 8
-TIMEOUT_SECONDS = 60
+TIMEOUT_SECONDS = 110
 
 '''
 Defines
 '''
-MASSIVE_STRING = 'A' * 10000
-MASSIVE_P_STRING = '%P' * 10000
+# MASSIVE_STRING = 'A' * 10000
+# MASSIVE_P_STRING = '%P' * 10000
 delimiters_mutations_arr = [
-    "", "%", "\n", "%n", "%s", "%d", "&=", "|=", "^=",
+    " ", "%", "\n", "%n", "&=", "|=", "^=",
     "<<=", ">>=", "=", "+=", "-=", "*=", "/=", "//=",
     "%=", "**=", ",", ".", ":", ";", "@", "(", ")", "{",
     "}", "[", "]", "\"", "\'", "\0"
 ]
-format_string_specifiers = ['%', 's', 'p', 'd', 'c', 'u', 'x', 'n']
 
 
 '''
@@ -103,57 +101,7 @@ def list_to_csv(data, delimiter=','):
 '''
 Sends a given input to a process, then returns whether the process crashes or not
 '''
-def send_to_process(payload, filepath):
-    p = list_to_csv(payload, ',')
-    _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
-    
-    global crashed, kill
-    if _crashed:
-        crashed = _crashed
-
-    if kill:
-        return False
-
-    # Handles the program logging if it crashes
-    if crashed:
-        global start
-        handle_logging(p, filepath, _code, len(found_paths), time.time() - start)
-        return True
-
-    # If a new output is found it is added to the queue
-    if _output not in found_paths:
-        found_paths.append(_output)
-        add_to_thread_queue(filepath, payload)
-
-    return False
-
-'''
-'''
-def rsend_to_process(payload, filepath):
-    _crashed, _output, _code = send_payload(payload, filepath, SEE_INPUTS, SEE_OUTPUTS)
-    
-    global crashed, kill
-    if _crashed:
-        crashed = _crashed
-
-    if kill:
-        return False
-
-    # Handles the program logging if it crashes
-    if crashed:
-        global start
-        handle_logging(payload, filepath, _code, len(found_paths), time.time() - start)
-        return True
-
-    # If a new output is found it is added to the queue
-    if _output not in found_paths:
-        found_paths.append(_output)
-        add_to_thread_queue(filepath, payload)
-
-    return False
-
-''' New Delim Version '''
-def send_to_process_newdelim(payload, filepath, delim):
+def send_to_process(payload, filepath, delim=','):
     p = list_to_csv(payload, delim)
     _crashed, _output, _code = send_payload(p, filepath, SEE_INPUTS, SEE_OUTPUTS)
     
@@ -176,6 +124,8 @@ def send_to_process_newdelim(payload, filepath, delim):
         add_to_thread_queue(filepath, payload)
 
     return False
+
+
 
 '''
 Main function call to begin fuzzing CSV input binaries
@@ -207,6 +157,8 @@ def add_to_thread_queue(filepath, data):
     threads.append(threading.Thread(target=mutate_delimiters, args=(data, filepath)))
     threads.append(threading.Thread(target=flip_bits, args=(data, filepath, 10)))
     threads.append(threading.Thread(target=mutate_strings, args=(data, filepath)))
+    threads.append(threading.Thread(target=mutate_index, args=(data, filepath, 1500)))
+    threads.append(threading.Thread(target=send_format_strings, args=(data, filepath)))
     threads.append(threading.Thread(target=test_empty_cells, args=(data, filepath)))
     threads.append(threading.Thread(target=add_random_bytes, args=(data, filepath)))
     threads.append(threading.Thread(target=add_bytes_sequential, args=(data, filepath)))
@@ -346,14 +298,10 @@ def mutate_delimiters(data: list, filepath):
         d = copy.deepcopy(data)
         
         if crashed or kill: return
-        if send_to_process_newdelim(d, filepath, delim):
+        if send_to_process(d, filepath, delim):
             crashed = True
             return
-    d = req.getPay()
-    if crashed or kill: return
-    if rsend_to_process(d, filepath):
-        crashed = True
-        return
+
 
 '''
 Flips bits of the values contained within the CSV
@@ -370,8 +318,10 @@ def flip_bits(data: list, filepath, numflips):
 
                 if is_str(curr):
                     bits = ustring_to_bits(curr)
-                else:
+                elif is_num(curr):
                     bits = unumber_to_bits(curr)
+                else:
+                    continue
 
                 for num in range(0, numflips):
                     flipped = uflip_bits_random(bits)
@@ -411,44 +361,38 @@ def mutate_strings(data: list, filepath):
     return
 
 '''
-Tries to add 1 - 1000 length strings in each index of the CSV
+Replaces each index and then each row with strings of given length 
 '''
-def mutate_index(data: list, filepath, startNum):
+def mutate_index(data: list, filepath, length):
     global crashed, kill
     width = len(data[0])
     height = len(data)
 
-    for x in range (startNum, startNum + 500):
-        for i in range(0, height):
-                for j in range (0, width):
-                    d = copy.deepcopy(data)
-                        
-                    d[i][j] = 'A' * x
+    # One cell at a time
+    for i in range(0, height):
+            for j in range (0, width):
+                d = copy.deepcopy(data)
+                    
+                d[i][j] = 'A' * length
 
-                    if crashed or kill: return
-                    if send_to_process(d, filepath):
-                        crashed = True
-                        return
+                if crashed or kill: return
+                if send_to_process(d, filepath):
+                    crashed = True
+                    return
+                
+    # One row at a time
+    for i in range(0, height):
+            d2 = copy.deepcopy(data)
+            for j in range (0, width):
+                d2[i][j] = 'A' * length
+
+            if crashed or kill: return
+            if send_to_process(d2, filepath):
+                crashed = True
+                return
+
     return
 
-'''
-Replaces a random value with another random value
-'''
-def replace_random_with_value(string, replacement):
-    if not string:  # If the string is empty, return it as-is
-        return string
-
-    # Convert the string to a list of characters to modify it
-    string_list = list(string)
-
-    # Select a random index
-    random_index = random.randint(0, len(string_list) - 1)
-
-    # Replace the character at the selected index with '\0'
-    string_list[random_index] = replacement
-
-    # Join the list back into a string and return it
-    return ''.join(string_list)
 
 '''
 Sends format string payloads
@@ -460,20 +404,14 @@ def send_format_strings(data: list, filepath):
 
     for i in range(0, height):
             for j in range (0, width):
-                for num in range(0, 51):
-                    d = copy.deepcopy(data)
-                    for format_spec in format_string_specifiers:
-                        if num == 0:
-                            format_string = f'%{format_spec}'
-                        else:
-                            format_string = f'%{num}${format_spec}'
-                        
-                        d[i][j] = format_string
+                for num in [1, 15, 40, 100]:
+                    d = copy.deepcopy(data)                    
+                    d[i][j] = f'%{num}$s'
 
-                        if crashed or kill: return
-                        if send_to_process(d, filepath):
-                            crashed = True
-                            return
+                    if crashed or kill: return
+                    if send_to_process(d, filepath):
+                        crashed = True
+                        return
 
 '''
 Tests emptying random cells within the CSV
@@ -483,8 +421,8 @@ def test_empty_cells(data: list, filepath):
     width = len(data[0])
     height = len(data)
 
-    for i in range(0, height):
-            for j in range (0, width):
+    for i in range(height):
+            for j in range (width):
                 d = copy.deepcopy(data)
 
                 del d[i][j]
@@ -494,31 +432,7 @@ def test_empty_cells(data: list, filepath):
                     crashed = True
                     return
     
-    if width > 1:
-        for i in range(0, height):
-                for j in range (0, width-1):
-                    d = copy.deepcopy(data)
 
-                    del d[i][j]
-                    del d[i][j]
-
-                    if crashed or kill: return
-                    if send_to_process(d, filepath):
-                        crashed = True
-                        return
-    
-    if height > 1: 
-        for i in range(0, height-1):
-                for j in range (0, width):
-                    d = copy.deepcopy(data)
-
-                    del d[i][j]
-                    del d[i+1][j]
-
-                    if crashed or kill: return
-                    if send_to_process(d, filepath):
-                        crashed = True
-                        return
 
 '''
 Adds random bytes to the elements of the CSV
@@ -528,9 +442,9 @@ def add_random_bytes(data: list, filepath):
     width = len(data[0])
     height = len(data)
 
-    for i in range(0, height):
-        for j in range(0, width):
-            for nunm in range(1, 11):
+    for i in range(height):
+        for j in range(width):
+            for num in range(1, 11):
                 for _ in range(1, 11):
                     d = copy.deepcopy(data)
                     d[i][j] = uadd_random_bytes(d[i][j], _)
@@ -578,21 +492,21 @@ def add_bytes_sequential(data: list, filepath):
                     return
 
 
-'''
-Replaces a random value with another random value
-'''
-def replace_random_with_value(string, replacement):
-    if not string:  # If the string is empty, return it as-is
-        return string
+# '''
+# Replaces a random value with another random value
+# '''
+# def replace_random_with_value(string, replacement):
+#     if not string:  # If the string is empty, return it as-is
+#         return string
 
-    # Convert the string to a list of characters to modify it
-    string_list = list(string)
+#     # Convert the string to a list of characters to modify it
+#     string_list = list(string)
 
-    # Select a random index
-    random_index = random.randint(0, len(string_list) - 1)
+#     # Select a random index
+#     random_index = random.randint(0, len(string_list) - 1)
 
-    # Replace the character at the selected index with '\0'
-    string_list[random_index] = replacement
+#     # Replace the character at the selected index with '\0'
+#     string_list[random_index] = replacement
 
-    # Join the list back into a string and return it
-    return ''.join(string_list)
+#     # Join the list back into a string and return it
+#     return ''.join(string_list)
