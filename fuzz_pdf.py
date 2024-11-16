@@ -1,4 +1,5 @@
 from pypdf import PdfWriter
+from pypdf import PdfReader
 import copy
 import random
 import os
