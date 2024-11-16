@@ -26,8 +26,6 @@ Returns whether the given data is a valid PDF or not
 '''
 def is_pdf(words):
     try:
-        print("trying pdf")
-
         # test if first few characters in given data are %PDF
         if words[:4] == b"%PDF":
             return True
